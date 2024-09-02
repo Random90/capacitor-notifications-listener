@@ -1,6 +1,6 @@
 {
   "name": "capacitor-notifications-listener",
-  "version": "0.0.1",
+  "version": "0.1",
   "description": "Read Android Apps Notifications",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",

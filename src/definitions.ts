@@ -1,17 +1,19 @@
+import type { PluginListenerHandle } from '@capacitor/core';
+
 export interface NotificationsListenerPlugin {
-  echo(options: { value: string }): Promise<{ value: string }>;
-  attachListener(
+  addListener(
     eventName: 'notificationRemovedEvent',
-    callback: (info: AndroidNotification) => void,
-  ): AndroidNotification;
-  attachListener(
+    listenerFunc: (info: AndroidNotification) => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
     eventName: 'notificationReceivedEvent',
-    callback: (info: AndroidNotification) => void,
-  ): AndroidNotification;
-  startListening(): Promise<{ value: boolean }>;
-  stopListening(): Promise<{ value: boolean }>;
-  // requestPermission(): Promise<void>;
+    listenerFunc: (info: AndroidNotification) => void,
+  ): Promise<PluginListenerHandle>;
+  startListening(): Promise<void>;
+  stopListening(): Promise<void>;
+  requestPermission(): Promise<void>;
   isListening(): Promise<{ value: boolean }>;
+  removeAllListeners(): Promise<void>;
 }
 
 export interface AndroidNotification {
@@ -19,6 +21,6 @@ export interface AndroidNotification {
   text: string;
   textlines: string[];
   title: string;
-  time: Date;
+  time: number; // timestamp
   package: string;
 }
