@@ -7,32 +7,24 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Build;
+import android.os.Bundle;
 import android.provider.Settings;
 import android.util.Log;
-
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
-
+import java.util.Objects;
 import org.json.JSONArray;
 
-import java.util.Objects;
-
 @CapacitorPlugin(
-        name = "NotificationsListener",
-        permissions = {
-                @Permission(
-                        alias = "notifications",
-                        strings = { Manifest.permission.BIND_NOTIFICATION_LISTENER_SERVICE }
-                )
-        }
-
+    name = "NotificationsListener",
+    permissions = { @Permission(alias = "notifications", strings = { Manifest.permission.BIND_NOTIFICATION_LISTENER_SERVICE }) }
 )
-
 public class NotificationsListenerPlugin extends Plugin {
+
     private static final String TAG = NotificationsListenerPlugin.class.getSimpleName();
     private static final String EVENT_NOTIFICATION_REMOVED = "notificationRemovedEvent";
     private static final String EVENT_NOTIFICATION_RECEIVED = "notificationReceivedEvent";
@@ -40,7 +32,7 @@ public class NotificationsListenerPlugin extends Plugin {
     private NotificationReceiver notificationreceiver;
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    @PluginMethod()
+    @PluginMethod
     public void startListening(PluginCall call) {
         if (notificationreceiver != null) {
             call.resolve();
@@ -68,11 +60,11 @@ public class NotificationsListenerPlugin extends Plugin {
     @PluginMethod
     public void isListening(PluginCall call) {
         JSObject ret = new JSObject();
-        ret.put("value",  NotificationService.isConnected);
+        ret.put("value", NotificationService.isConnected);
         call.resolve(ret);
     }
 
-    @PluginMethod()
+    @PluginMethod
     public void stopListening(PluginCall call) {
         if (notificationreceiver == null) {
             call.resolve();
@@ -83,15 +75,33 @@ public class NotificationsListenerPlugin extends Plugin {
     }
 
     private class NotificationReceiver extends BroadcastReceiver {
+
         @Override
         public void onReceive(Context context, Intent intent) {
+            // Log all extras in the intent
+            Bundle extras = intent.getExtras();
+            if (extras != null) {
+                for (String key : extras.keySet()) {
+                    Object value = extras.get(key);
+                    if (value == null) return;
+                    Log.d(TAG, String.format("Intent extra: %s = %s (%s)", key, value.toString(), value.getClass().getName()));
+                }
+            }
+
+            Log.d(TAG, intent.getType() != null ? intent.getType() : "null");
+            Log.d(TAG, intent.getAction() != null ? intent.getAction() : "null");
+            Log.d(TAG, intent.getDataString() != null ? intent.getDataString() : "null");
+            Log.d(TAG, intent.getScheme() != null ? intent.getScheme() : "null");
+            Log.d(TAG, intent.getPackage() != null ? intent.getPackage() : "null");
+            Log.d(TAG, intent.getComponent() != null ? intent.getComponent().toString() : "null");
+            Log.d(TAG, intent.toString());
+
             JSObject jo = new JSObject();
             try {
                 jo.put("apptitle", intent.getStringExtra(NotificationService.ARG_APPTITLE));
                 jo.put("text", intent.getStringExtra(NotificationService.ARG_TEXT));
                 JSONArray ja = new JSONArray();
-                for (String k : Objects.requireNonNull(intent.getStringArrayExtra(NotificationService.ARG_TEXTLINES)))
-                    ja.put(k);
+                for (String k : Objects.requireNonNull(intent.getStringArrayExtra(NotificationService.ARG_TEXTLINES))) ja.put(k);
                 jo.put("textlines", ja.toString());
                 jo.put("title", intent.getStringExtra(NotificationService.ARG_TITLE));
                 jo.put("time", intent.getLongExtra(NotificationService.ARG_TIME, System.currentTimeMillis()));
@@ -100,11 +110,15 @@ public class NotificationsListenerPlugin extends Plugin {
                 Log.e(TAG, "JSObject Error");
                 return;
             }
-            switch (Objects.requireNonNull(intent.getAction())){
+            switch (Objects.requireNonNull(intent.getAction())) {
                 case NotificationService.ACTION_RECEIVE:
+                    // TODO test with retainUntilConsumed
+                    // log original intent
+                    Log.d(TAG, "Received notification: " + jo.toString());
+
                     notifyListeners(EVENT_NOTIFICATION_RECEIVED, jo);
                     break;
-                case NotificationService.ACTION_REMOVE :
+                case NotificationService.ACTION_REMOVE:
                     notifyListeners(EVENT_NOTIFICATION_REMOVED, jo);
                     break;
             }
