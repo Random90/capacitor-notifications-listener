@@ -15,7 +15,7 @@ npx cap sync
 
 * [`addListener('notificationRemovedEvent', ...)`](#addlistenernotificationremovedevent-)
 * [`addListener('notificationReceivedEvent', ...)`](#addlistenernotificationreceivedevent-)
-* [`startListening()`](#startlistening)
+* [`startListening(...)`](#startlistening)
 * [`stopListening()`](#stoplistening)
 * [`requestPermission()`](#requestpermission)
 * [`isListening()`](#islistening)
@@ -59,11 +59,15 @@ addListener(eventName: 'notificationReceivedEvent', listenerFunc: (info: Android
 --------------------
 
 
-### startListening()
+### startListening(...)
 
 ```typescript
-startListening() => Promise<void>
+startListening(options: ListenerOptions) => Promise<void>
 ```
+
+| Param         | Type                                                        |
+| ------------- | ----------------------------------------------------------- |
+| **`options`** | <code><a href="#listeneroptions">ListenerOptions</a></code> |
 
 --------------------
 
@@ -126,5 +130,12 @@ removeAllListeners() => Promise<void>
 | **`title`**     | <code>string</code>   |
 | **`time`**      | <code>number</code>   |
 | **`package`**   | <code>string</code>   |
+
+
+#### ListenerOptions
+
+| Prop                     | Type                 |
+| ------------------------ | -------------------- |
+| **`cacheNotifications`** | <code>boolean</code> |
 
 </docgen-api>
