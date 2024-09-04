@@ -16,6 +16,7 @@ npx cap sync
 * [`addListener('notificationRemovedEvent', ...)`](#addlistenernotificationremovedevent-)
 * [`addListener('notificationReceivedEvent', ...)`](#addlistenernotificationreceivedevent-)
 * [`startListening(...)`](#startlistening)
+* [`restoreCachedNotifications()`](#restorecachednotifications)
 * [`stopListening()`](#stoplistening)
 * [`requestPermission()`](#requestpermission)
 * [`isListening()`](#islistening)
@@ -68,6 +69,17 @@ startListening(options: ListenerOptions) => Promise<void>
 | Param         | Type                                                        |
 | ------------- | ----------------------------------------------------------- |
 | **`options`** | <code><a href="#listeneroptions">ListenerOptions</a></code> |
+
+--------------------
+
+
+### restoreCachedNotifications()
+
+```typescript
+restoreCachedNotifications() => Promise<void>
+```
+
+Call this after attaching listeners and after starting listening. If nothing is cached, nothing will happen.
 
 --------------------
 

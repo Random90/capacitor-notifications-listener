@@ -26,6 +26,9 @@ export class NotificationsListenerWeb
   startListening(): Promise<void> {
     throw new Error(this.errorMessage);
   }
+  restoreCachedNotifications(): Promise<void> {
+    throw new Error(this.errorMessage);
+  }
   stopListening(): Promise<void> {
     throw new Error(this.errorMessage);
   }

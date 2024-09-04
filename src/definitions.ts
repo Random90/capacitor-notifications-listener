@@ -14,6 +14,10 @@ export interface NotificationsListenerPlugin {
    * @param cacheNotifications If true, the plugin will cache all RECEIVED notifications that and emit them when the webview is in the foreground.
    */
   startListening(options: ListenerOptions): Promise<void>;
+  /**
+   * Call this after attaching listeners and after starting listening. If nothing is cached, nothing will happen.
+   */
+  restoreCachedNotifications(): Promise<void>;
   stopListening(): Promise<void>;
   requestPermission(): Promise<void>;
   isListening(): Promise<{ value: boolean }>;

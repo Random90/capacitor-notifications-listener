@@ -16,9 +16,9 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 
-import java.util.ArrayList;
 import java.util.Objects;
 import org.json.JSONArray;
+import org.json.JSONObject;
 
 @CapacitorPlugin(
     name = "NotificationsListener",
@@ -29,43 +29,24 @@ public class NotificationsListenerPlugin extends Plugin {
     private static final String TAG = NotificationsListenerPlugin.class.getSimpleName();
     private static final String EVENT_NOTIFICATION_REMOVED = "notificationRemovedEvent";
     private static final String EVENT_NOTIFICATION_RECEIVED = "notificationReceivedEvent";
+    private static final String STORAGE_KEY = "notificationsCache";
 
     private Boolean cacheEnabled = false;
     private Boolean webViewActive = true;
-    private final ArrayList<JSObject> notificationsCache = new ArrayList<>();
+    private SimpleStorage persistentStorage;
 
     private NotificationReceiver notificationReceiver;
 
     public void load() {
-        bridge.getApp().setStatusChangeListener((isActive) -> {
-            Log.d(TAG, "App is now " + (isActive ? "active" : "inactive"));
-            Log.d(TAG, "cache size: " + notificationsCache.size());
-            if (notificationReceiver != null) {
-                notificationReceiver.setWebViewActive(isActive);
-            }
-            if (isActive) {
-                webViewActive = true;
-
-                if (cacheEnabled) {
-                    for (JSObject jo : notificationsCache) {
-                        Log.d(TAG, "cache size: " + notificationsCache.size());
-                        Log.d(TAG, "Restoring cached notification: " + jo.toString());
-                        notifyListeners(EVENT_NOTIFICATION_RECEIVED, jo);
-                    }
-                    notificationsCache.clear();
-                    Log.d(TAG, "cache size: " + notificationsCache.size());
-                }
-            } else {
-                webViewActive = false;
-            }
-        });
+        persistentStorage =  new SimpleStorage(getContext());
+        attachAppStateListener();
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @PluginMethod
     public void startListening(PluginCall call) {
-        cacheEnabled = call.getBoolean("cacheNotifications", false);
-        Log.d(TAG, "Cache enabled: " + cacheEnabled + " notificationReceiver exists: " + (notificationReceiver != null));
+        Boolean cacheEnabledValue = call.getBoolean("cacheNotifications");
+        cacheEnabled = (cacheEnabledValue != null) ? cacheEnabledValue : false;
         if (notificationReceiver != null) {
             notificationReceiver.setCacheEnabled(cacheEnabled);
             call.resolve();
@@ -76,11 +57,19 @@ public class NotificationsListenerPlugin extends Plugin {
         IntentFilter filter = new IntentFilter();
         filter.addAction(NotificationService.ACTION_RECEIVE);
         filter.addAction(NotificationService.ACTION_REMOVE);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             getContext().registerReceiver(notificationReceiver, filter);
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             getContext().registerReceiver(notificationReceiver, filter, Context.RECEIVER_EXPORTED);
         }
+
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void restoreCachedNotifications(PluginCall call) {
+        restoreFromCache();
         call.resolve();
     }
 
@@ -108,6 +97,44 @@ public class NotificationsListenerPlugin extends Plugin {
     }
 
 
+    private void attachAppStateListener() {
+        bridge.getApp().setStatusChangeListener((isActive) -> {
+            Log.d(TAG, "App is now " + (isActive ? "active" : "inactive"));
+            Log.d(TAG, "cache size: " + persistentStorage.size(STORAGE_KEY));
+            if (notificationReceiver != null) {
+                notificationReceiver.setWebViewActive(isActive);
+            }
+            if (isActive) {
+                webViewActive = true;
+
+                if (cacheEnabled) {
+                    restoreFromCache();
+                }
+            } else {
+                webViewActive = false;
+            }
+        });
+    }
+
+    private void restoreFromCache() {
+        JSONArray persistedJSONArray = persistentStorage.retrieve(STORAGE_KEY);
+        if (persistedJSONArray == null) {
+            Log.d(TAG, "No cached notifications to restore");
+            return;
+        }
+        Log.d(TAG, "Cache size: " + persistentStorage.size(STORAGE_KEY));
+        try {
+            for (int i = 0; i < persistedJSONArray.length(); i++) {
+                JSONObject jo = persistedJSONArray.getJSONObject(i);
+                Log.d(TAG, "Restoring cached notification: " + jo.toString());
+                notifyListeners(EVENT_NOTIFICATION_RECEIVED, new JSObject(jo.toString()));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error restoring cached notifications");
+            e.printStackTrace();
+        }
+        persistentStorage.remove(STORAGE_KEY);
+    }
 
     private class NotificationReceiver extends BroadcastReceiver {
         private boolean cacheEnabled;
@@ -164,12 +191,10 @@ public class NotificationsListenerPlugin extends Plugin {
                 case NotificationService.ACTION_RECEIVE:
                     // log original intent
                     Log.d(TAG, "Received notification: " + jo.toString());
-                    Log.d(TAG, "Cache enabled: " + cacheEnabled + ", WebView active: " + webViewActive);
                     if (cacheEnabled && !webViewActive) {
-                        Log.d(TAG, "Caching notification: " + jo.toString());
-                        // TODO store in storage
-                        notificationsCache.add(jo);
-                        Log.d(TAG, "cache size: " + notificationsCache.size());
+                        Log.d(TAG, "Caching notification");
+                        persistentStorage.append(STORAGE_KEY, jo);
+                        Log.d(TAG, "New cache size: " + persistentStorage.size(STORAGE_KEY));
                         return;
                     }
                     notifyListeners(EVENT_NOTIFICATION_RECEIVED, jo);
