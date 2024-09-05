@@ -17,9 +17,19 @@ public class NotificationService extends NotificationListenerService {
     public static final String ARG_TEXTLINES = "notification_event_textlines";
     public static final String ARG_TIME = " notification_event_time";
 
+    // hacky singleton to keep the receiver instance across plugin restarts
+    // TODO hold the 'old' app context?
+    public static NotificationsListenerPlugin.NotificationReceiver notificationReceiver;
     public static boolean isConnected = false;
 
     private static final String TAG = NotificationService.class.getSimpleName();
+
+    @Override
+    public void onDestroy() {
+        if (notificationReceiver != null) {
+            notificationReceiver.unregister(this);
+        }
+    }
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
@@ -81,3 +91,5 @@ public class NotificationService extends NotificationListenerService {
         return out;
     }
 }
+
+

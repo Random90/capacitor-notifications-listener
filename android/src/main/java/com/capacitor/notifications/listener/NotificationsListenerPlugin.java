@@ -9,6 +9,7 @@ import android.content.IntentFilter;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -17,12 +18,13 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 
 import java.util.Objects;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 @CapacitorPlugin(
-    name = "NotificationsListener",
-    permissions = { @Permission(alias = "notifications", strings = { Manifest.permission.BIND_NOTIFICATION_LISTENER_SERVICE }) }
+        name = "NotificationsListener",
+        permissions = {@Permission(alias = "notifications", strings = {Manifest.permission.BIND_NOTIFICATION_LISTENER_SERVICE})}
 )
 public class NotificationsListenerPlugin extends Plugin {
 
@@ -35,15 +37,14 @@ public class NotificationsListenerPlugin extends Plugin {
     private Boolean webViewActive = true;
     private SimpleStorage persistentStorage;
 
-    private NotificationReceiver notificationReceiver;
-
     public void load() {
-        persistentStorage =  new SimpleStorage(getContext());
+        persistentStorage = new SimpleStorage(getContext());
         attachAppStateListener();
     }
 
     @Override
     protected void handleOnDestroy() {
+        // TODO also remove listeners?
         Log.d(TAG, "Destroyed");
     }
 
@@ -52,23 +53,16 @@ public class NotificationsListenerPlugin extends Plugin {
     public void startListening(PluginCall call) {
         Boolean cacheEnabledValue = call.getBoolean("cacheNotifications");
         cacheEnabled = (cacheEnabledValue != null) ? cacheEnabledValue : false;
-        if (notificationReceiver != null) {
-            notificationReceiver.setCacheEnabled(cacheEnabled);
-            call.resolve();
+        if (NotificationService.notificationReceiver != null) {
             Log.d(TAG, "NotificationReceiver already exists");
-            return;
+            NotificationService.notificationReceiver.unregister(getContext());
         }
-        notificationReceiver = new NotificationReceiver(cacheEnabled, webViewActive);
+        NotificationService.notificationReceiver = new NotificationReceiver(cacheEnabled, webViewActive);
         IntentFilter filter = new IntentFilter();
         filter.addAction(NotificationService.ACTION_RECEIVE);
         filter.addAction(NotificationService.ACTION_REMOVE);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            getContext().registerReceiver(notificationReceiver, filter);
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            getContext().registerReceiver(notificationReceiver, filter, Context.RECEIVER_EXPORTED);
-        }
-
+        NotificationService.notificationReceiver.register(getContext(), filter);
         call.resolve();
     }
 
@@ -93,19 +87,19 @@ public class NotificationsListenerPlugin extends Plugin {
 
     @PluginMethod
     public void stopListening(PluginCall call) {
-        if (notificationReceiver == null) {
+        if (NotificationService.notificationReceiver == null) {
             call.resolve();
             return;
         }
-        getContext().unregisterReceiver(notificationReceiver);
+        NotificationService.notificationReceiver.unregister(getContext());
         call.resolve();
     }
 
 
     private void attachAppStateListener() {
         bridge.getApp().setStatusChangeListener((isActive) -> {
-            if (notificationReceiver != null) {
-                notificationReceiver.setWebViewActive(isActive);
+            if (NotificationService.notificationReceiver != null) {
+                NotificationService.notificationReceiver.setWebViewActive(isActive);
             }
             if (isActive) {
                 webViewActive = true;
@@ -139,7 +133,8 @@ public class NotificationsListenerPlugin extends Plugin {
         persistentStorage.remove(STORAGE_KEY);
     }
 
-    private class NotificationReceiver extends BroadcastReceiver {
+    public class NotificationReceiver extends BroadcastReceiver {
+        public boolean isRegistered;
         private boolean cacheEnabled;
         private boolean webViewActive;
 
@@ -147,6 +142,49 @@ public class NotificationsListenerPlugin extends Plugin {
             Log.d(TAG, "NotificationReceiver created");
             this.cacheEnabled = cacheEnabled;
             this.webViewActive = webViewActive;
+        }
+
+        /**
+         * @return see Context.registerReceiver(BroadcastReceiver,IntentFilter)
+         */
+        @SuppressLint("UnspecifiedRegisterReceiverFlag")
+        public Intent register(Context context, IntentFilter filter) {
+            try {
+                if (!isRegistered) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                        return context.registerReceiver(this, filter);
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        return context.registerReceiver(this, filter, Context.RECEIVER_EXPORTED);
+                    }
+                }
+                return null;
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            } finally {
+                isRegistered = true;
+            }
+        }
+
+        /**
+         * @return true if was registered else false
+         */
+        public boolean unregister(Context context) {
+            // TODO hold the weak reference to old context in service, so the receiver can be properly removed.
+            // currently after killing the app context is new. At least reference to the receiver is kept in the service, so unregistering it
+            // stops sending data to the WebView
+            return isRegistered
+                    && unregisterInternal(context);
+        }
+
+        private boolean unregisterInternal(Context context) {
+            try {
+                context.unregisterReceiver(this);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            isRegistered = false;
+            return true;
         }
 
         public void setCacheEnabled(boolean cacheEnabled) {
@@ -159,12 +197,17 @@ public class NotificationsListenerPlugin extends Plugin {
 
         @Override
         public void onReceive(Context context, Intent intent) {
+            if (!isRegistered) {
+                Log.w(TAG, "Unregistered receiver is still registered in Android. Hope it kills it");
+                return;
+            }
             JSObject jo = new JSObject();
             try {
                 jo.put("apptitle", intent.getStringExtra(NotificationService.ARG_APPTITLE));
                 jo.put("text", intent.getStringExtra(NotificationService.ARG_TEXT));
                 JSONArray ja = new JSONArray();
-                for (String k : Objects.requireNonNull(intent.getStringArrayExtra(NotificationService.ARG_TEXTLINES))) ja.put(k);
+                for (String k : Objects.requireNonNull(intent.getStringArrayExtra(NotificationService.ARG_TEXTLINES)))
+                    ja.put(k);
                 jo.put("textlines", ja.toString());
                 jo.put("title", intent.getStringExtra(NotificationService.ARG_TITLE));
                 jo.put("time", intent.getLongExtra(NotificationService.ARG_TIME, System.currentTimeMillis()));
