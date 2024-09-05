@@ -1,12 +1,100 @@
 # capacitor-notifications-listener
 
-Read Android Apps Notifications
+Plugin for reading all android notifications in capacitor. With this plugin you can read other apps notifications and create some automations based on their contents.
+
+It is a replacement of [https://github.com/Alone2/capacitor-notificationlistener](https://github.com/Alone2/capacitor-notificationlistener), that was archived due to lack of updates. 
+
+This plugin works on Android 14 and adds few additional features like persistent notifications caching.
+Tested on Capacitor v6.
 
 ## Install
 
 ```bash
 npm install capacitor-notifications-listener
 npx cap sync
+```
+Next click Android studio -> Sync project with gradle files.
+
+To enable the listener, add this service to your `AndroidManifest.xml` inside `<application>`:
+```xml
+<service android:name="com.capacitor.notifications.listener.NotificationService"
+    android:exported="true"
+    android:label="@string/app_name"
+    android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+    <intent-filter>
+        <action android:name="android.service.notification.NotificationListenerService" />
+    </intent-filter>
+</service>
+```
+## Usage
+### Basic
+
+Import the plugin.
+```typescript
+import { AndroidNotification, NotificationsListener, NotificationsListenerPlugin } from 'capacitor-notifications-listener';
+
+const systemNotificationListener: NotificationsListenerPlugin = NotificationsListener;
+```
+
+Start listening for notifications. 
+```typescript
+systemNotificationListener.startListening();
+```
+
+Add a listener for new notifications or the removal of notifications.
+Make sure you have called ```sn.startListening()``` to be able to receive notifications.
+```typescript
+systemNotificationListener.addListener("notificationReceivedEvent", (notification: AndroidNotification) => {
+    // logic ...
+});
+systemNotificationListener.addListener("notificationRemovedEvent", (notification: AndroidNotification) => {
+    // logic ...
+});
+```
+
+AndroidNotification Interface.
+The anotomy of android notifications is explained [here](https://developer.android.com/guide/topics/ui/notifiers/notifications#Templates).
+```typescript
+interface AndroidNotification {
+  apptitle: string;     // Title of a notifications' app
+  text: string;         // Text of a notification
+  textlines: string[];  // Text of a multi-line notification
+  title: string;        // Title of a notification
+  time: number;         // Received timestamp
+  package: string;      // Package-name of a notifications' app
+}
+```
+
+Check if the App is listening for notifications.
+If it is not, even though ```systemNotificationListener.startListening()``` was called,
+your app doesn't have sufficient permissions to observe notifications.
+Call ```systemNotificationListener.requestPermission()``` to "open settings -> apps -> special app access -> notification read, reply and control" screen. User must select your app and enable this special permission manually, so make sure to instruct the user how to do it. 
+```typescript
+systemNotificationListener.isListening().then((isListening : boolean) => {
+    if (!isListening.value)
+        // show permission screen
+        systemNotificationListener.requestPermission()
+});
+```
+
+Open settings so that the user can authorize your app.
+```typescript
+systemNotificationListener.requestPermission();
+```
+
+
+### Notifications caching
+
+The service will continue to receive notifications even if your WebView app was killed. If you enable caching, those notifications will be saved in Android Preferences Storage as JSON. It's not the quickest way to store data, but if your app does not process thousands of notifications, it won't be a problem. Better storage solution is in TODO. 
+
+To enable caching, pass additional options when starting:
+```TypeScript 
+systemNotificationListener.startListening({ cacheNotifications: true }); 
+```
+
+Next, when your aplication resumes or starts, call this method and the plugin will send any saved notifications. Notifications will be passed the same way as the new ones are passed to your app, so you don't have to do anything else besides calling that method. After calling, cache will be cleared.
+```TypeScript
+systemNotificationListener.restoreCachedNotifications();
 ```
 
 ## API

@@ -42,6 +42,11 @@ public class NotificationsListenerPlugin extends Plugin {
         attachAppStateListener();
     }
 
+    @Override
+    protected void handleOnDestroy() {
+        Log.d(TAG, "Destroyed");
+    }
+
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @PluginMethod
     public void startListening(PluginCall call) {
@@ -99,8 +104,6 @@ public class NotificationsListenerPlugin extends Plugin {
 
     private void attachAppStateListener() {
         bridge.getApp().setStatusChangeListener((isActive) -> {
-            Log.d(TAG, "App is now " + (isActive ? "active" : "inactive"));
-            Log.d(TAG, "cache size: " + persistentStorage.size(STORAGE_KEY));
             if (notificationReceiver != null) {
                 notificationReceiver.setWebViewActive(isActive);
             }
@@ -141,6 +144,7 @@ public class NotificationsListenerPlugin extends Plugin {
         private boolean webViewActive;
 
         private NotificationReceiver(boolean cacheEnabled, boolean webViewActive) {
+            Log.d(TAG, "NotificationReceiver created");
             this.cacheEnabled = cacheEnabled;
             this.webViewActive = webViewActive;
         }
@@ -155,24 +159,6 @@ public class NotificationsListenerPlugin extends Plugin {
 
         @Override
         public void onReceive(Context context, Intent intent) {
-            // Log all extras in the intent
-//            Bundle extras = intent.getExtras();
-//            if (extras != null) {
-//                for (String key : extras.keySet()) {
-//                    Object value = extras.get(key);
-//                    if (value == null) return;
-//                    Log.d(TAG, String.format("Intent extra: %s = %s (%s)", key, value.toString(), value.getClass().getName()));
-//                }
-//            }
-
-//            Log.d(TAG, intent.getType() != null ? intent.getType() : "null");
-//            Log.d(TAG, intent.getAction() != null ? intent.getAction() : "null");
-//            Log.d(TAG, intent.getDataString() != null ? intent.getDataString() : "null");
-//            Log.d(TAG, intent.getScheme() != null ? intent.getScheme() : "null");
-//            Log.d(TAG, intent.getPackage() != null ? intent.getPackage() : "null");
-//            Log.d(TAG, intent.getComponent() != null ? intent.getComponent().toString() : "null");
-//            Log.d(TAG, intent.toString());
-
             JSObject jo = new JSObject();
             try {
                 jo.put("apptitle", intent.getStringExtra(NotificationService.ARG_APPTITLE));
