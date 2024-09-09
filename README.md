@@ -81,7 +81,15 @@ Open settings so that the user can authorize your app.
 ```typescript
 systemNotificationListener.requestPermission();
 ```
+### Apps whitelisting
 
+To listen only to specific apps, provide array of packages names in `startListening` options object:
+
+```Typescript
+systemNotificationListener.startListening({ packagesWhiteList: ['com.example.appone', 'org.example.apptwo'] }); 
+```
+
+To replace the whitelist with the new one after initialization, use `replacePackagesWhitelist()` method.
 
 ### Notifications caching
 
@@ -109,6 +117,7 @@ systemNotificationListener.restoreCachedNotifications();
 * [`requestPermission()`](#requestpermission)
 * [`isListening()`](#islistening)
 * [`removeAllListeners()`](#removealllisteners)
+* [`replacePackagesWhitelist(...)`](#replacepackageswhitelist)
 * [Interfaces](#interfaces)
 
 </docgen-index>
@@ -187,6 +196,8 @@ stopListening() => Promise<void>
 requestPermission() => Promise<void>
 ```
 
+Navigates to special app permissions settings screen.
+
 --------------------
 
 
@@ -206,6 +217,21 @@ isListening() => Promise<{ value: boolean; }>
 ```typescript
 removeAllListeners() => Promise<void>
 ```
+
+--------------------
+
+
+### replacePackagesWhitelist(...)
+
+```typescript
+replacePackagesWhitelist(packages: string[]) => Promise<void>
+```
+
+Replace the current white list of packages with new one.
+
+| Param          | Type                  |
+| -------------- | --------------------- |
+| **`packages`** | <code>string[]</code> |
 
 --------------------
 
@@ -234,8 +260,9 @@ removeAllListeners() => Promise<void>
 
 #### ListenerOptions
 
-| Prop                     | Type                 |
-| ------------------------ | -------------------- |
-| **`cacheNotifications`** | <code>boolean</code> |
+| Prop                     | Type                  |
+| ------------------------ | --------------------- |
+| **`cacheNotifications`** | <code>boolean</code>  |
+| **`packagesWhiteList`**  | <code>string[]</code> |
 
 </docgen-api>

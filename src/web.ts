@@ -38,4 +38,7 @@ export class NotificationsListenerWeb
   isListening(): Promise<{ value: boolean }> {
     throw new Error(this.errorMessage);
   }
+  replacePackagesWhitelist(): Promise<void> {
+    throw new Error(this.errorMessage);
+  }
 }

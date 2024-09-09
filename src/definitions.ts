@@ -19,13 +19,22 @@ export interface NotificationsListenerPlugin {
    */
   restoreCachedNotifications(): Promise<void>;
   stopListening(): Promise<void>;
+  /**
+   * Navigates to special app permissions settings screen.
+   */
   requestPermission(): Promise<void>;
   isListening(): Promise<{ value: boolean }>;
   removeAllListeners(): Promise<void>;
+  /**
+   * Replace the current white list of packages with new one.
+   */
+  replacePackagesWhitelist(packages: string[]): Promise<void>;
 }
 
 export interface ListenerOptions {
   cacheNotifications?: boolean;
+  // listen to notifications from specific packages. Improves performance.
+  packagesWhiteList?: string[];
 }
 
 export interface AndroidNotification {

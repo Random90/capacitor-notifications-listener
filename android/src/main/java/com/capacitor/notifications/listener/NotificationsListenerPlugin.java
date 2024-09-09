@@ -17,6 +17,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 
+import java.util.ArrayList;
 import java.util.Objects;
 
 import org.json.JSONArray;
@@ -52,12 +53,18 @@ public class NotificationsListenerPlugin extends Plugin {
     @PluginMethod
     public void startListening(PluginCall call) {
         Boolean cacheEnabledValue = call.getBoolean("cacheNotifications");
+        // TODO: persist whitelist for autostart
+        ArrayList<String> packagesWhitelist = arrayFromPluginCall(call);
+        if (packagesWhitelist != null) {
+            Log.d(TAG, "Listening to packages: " + packagesWhitelist.toString());
+        }
+
         cacheEnabled = (cacheEnabledValue != null) ? cacheEnabledValue : false;
         if (NotificationService.notificationReceiver != null) {
             Log.d(TAG, "NotificationReceiver already exists");
             NotificationService.notificationReceiver.unregister(getContext());
         }
-        NotificationService.notificationReceiver = new NotificationReceiver(cacheEnabled, webViewActive);
+        NotificationService.notificationReceiver = new NotificationReceiver(cacheEnabled, webViewActive, packagesWhitelist);
         IntentFilter filter = new IntentFilter();
         filter.addAction(NotificationService.ACTION_RECEIVE);
         filter.addAction(NotificationService.ACTION_REMOVE);
@@ -92,6 +99,18 @@ public class NotificationsListenerPlugin extends Plugin {
             return;
         }
         NotificationService.notificationReceiver.unregister(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void replacePackagesWhiteList(PluginCall call) {
+        ArrayList<String> packagesWhitelist = arrayFromPluginCall(call);
+        NotificationService.notificationReceiver.setPackagesWhitelist(packagesWhitelist);
+        if (packagesWhitelist != null) {
+            Log.d(TAG, "Listening to new packages: " + packagesWhitelist.toString());
+        } else {
+            Log.d(TAG, "Whitelist disabled");
+        }
         call.resolve();
     }
 
@@ -133,15 +152,36 @@ public class NotificationsListenerPlugin extends Plugin {
         persistentStorage.remove(STORAGE_KEY);
     }
 
+    private ArrayList<String> arrayFromPluginCall(PluginCall call) {
+        ArrayList<String> list = new ArrayList<>();
+        JSONArray jsonArray = call.getArray("packagesWhitelist");
+        if (jsonArray != null) {
+            for (int i = 0; i < jsonArray.length(); i++) {
+                try {
+                    list.add(jsonArray.getString(i));
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing packagesWhitelist entry");
+                }
+            }
+        }
+        if (list.isEmpty()) {
+            return null;
+        }
+        return list;
+    }
+
     public class NotificationReceiver extends BroadcastReceiver {
         public boolean isRegistered;
         private boolean cacheEnabled;
         private boolean webViewActive;
+        private ArrayList<String> packagesWhitelist;
 
-        private NotificationReceiver(boolean cacheEnabled, boolean webViewActive) {
+        private NotificationReceiver(boolean cacheEnabled, boolean webViewActive, ArrayList<String> packagesWhitelist) {
             Log.d(TAG, "NotificationReceiver created");
+            this.isRegistered = false;
             this.cacheEnabled = cacheEnabled;
             this.webViewActive = webViewActive;
+            this.packagesWhitelist = packagesWhitelist;
         }
 
         /**
@@ -195,27 +235,20 @@ public class NotificationsListenerPlugin extends Plugin {
             this.webViewActive = webViewActive;
         }
 
+        public void setPackagesWhitelist(ArrayList<String> packagesWhitelist) {
+            this.packagesWhitelist = packagesWhitelist;
+        }
+
         @Override
         public void onReceive(Context context, Intent intent) {
             if (!isRegistered) {
                 Log.w(TAG, "Unregistered receiver is still registered in Android. Hope it kills it");
                 return;
             }
-            JSObject jo = new JSObject();
-            try {
-                jo.put("apptitle", intent.getStringExtra(NotificationService.ARG_APPTITLE));
-                jo.put("text", intent.getStringExtra(NotificationService.ARG_TEXT));
-                JSONArray ja = new JSONArray();
-                for (String k : Objects.requireNonNull(intent.getStringArrayExtra(NotificationService.ARG_TEXTLINES)))
-                    ja.put(k);
-                jo.put("textlines", ja.toString());
-                jo.put("title", intent.getStringExtra(NotificationService.ARG_TITLE));
-                jo.put("time", intent.getLongExtra(NotificationService.ARG_TIME, System.currentTimeMillis()));
-                jo.put("package", intent.getStringExtra(NotificationService.ARG_PACKAGE));
-            } catch (Exception e) {
-                Log.e(TAG, "JSObject Error");
+            if (packagesWhitelist != null && !existsInWhitelist(intent)) {
                 return;
             }
+            JSObject jo = parseNotification(intent);
             switch (Objects.requireNonNull(intent.getAction())) {
                 case NotificationService.ACTION_RECEIVE:
                     // log original intent
@@ -232,6 +265,30 @@ public class NotificationsListenerPlugin extends Plugin {
                     notifyListeners(EVENT_NOTIFICATION_REMOVED, jo);
                     break;
             }
+        }
+
+        private JSObject parseNotification(Intent intent) {
+            JSObject jo = new JSObject();
+            try {
+                jo.put("apptitle", intent.getStringExtra(NotificationService.ARG_APPTITLE));
+                jo.put("text", intent.getStringExtra(NotificationService.ARG_TEXT));
+                JSONArray ja = new JSONArray();
+                for (String k : Objects.requireNonNull(intent.getStringArrayExtra(NotificationService.ARG_TEXTLINES)))
+                    ja.put(k);
+                jo.put("textlines", ja.toString());
+                jo.put("title", intent.getStringExtra(NotificationService.ARG_TITLE));
+                jo.put("time", intent.getLongExtra(NotificationService.ARG_TIME, System.currentTimeMillis()));
+                jo.put("package", intent.getStringExtra(NotificationService.ARG_PACKAGE));
+            } catch (Exception e) {
+                Log.e(TAG, "JSObject Error");
+                return null;
+            }
+            return jo;
+        }
+
+        private boolean existsInWhitelist(Intent intent) {
+            String packageName = intent.getStringExtra(NotificationService.ARG_PACKAGE);
+            return packagesWhitelist.contains(packageName);
         }
     }
 }
