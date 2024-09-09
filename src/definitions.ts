@@ -28,13 +28,15 @@ export interface NotificationsListenerPlugin {
   /**
    * Replace the current white list of packages with new one.
    */
-  replacePackagesWhitelist(packages: string[]): Promise<void>;
+  replacePackagesWhitelist(options: {
+    packagesWhitelist: string[];
+  }): Promise<void>;
 }
 
 export interface ListenerOptions {
   cacheNotifications?: boolean;
   // listen to notifications from specific packages. Improves performance.
-  packagesWhiteList?: string[];
+  packagesWhitelist?: string[];
 }
 
 export interface AndroidNotification {

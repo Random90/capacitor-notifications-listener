@@ -86,7 +86,7 @@ systemNotificationListener.requestPermission();
 To listen only to specific apps, provide array of packages names in `startListening` options object:
 
 ```Typescript
-systemNotificationListener.startListening({ packagesWhiteList: ['com.example.appone', 'org.example.apptwo'] }); 
+systemNotificationListener.startListening({ packagesWhitelist: ['com.example.appone', 'org.example.apptwo'] }); 
 ```
 
 To replace the whitelist with the new one after initialization, use `replacePackagesWhitelist()` method.
@@ -224,14 +224,14 @@ removeAllListeners() => Promise<void>
 ### replacePackagesWhitelist(...)
 
 ```typescript
-replacePackagesWhitelist(packages: string[]) => Promise<void>
+replacePackagesWhitelist(options: { packagesWhitelist: string[]; }) => Promise<void>
 ```
 
 Replace the current white list of packages with new one.
 
-| Param          | Type                  |
-| -------------- | --------------------- |
-| **`packages`** | <code>string[]</code> |
+| Param         | Type                                          |
+| ------------- | --------------------------------------------- |
+| **`options`** | <code>{ packagesWhitelist: string[]; }</code> |
 
 --------------------
 
@@ -263,6 +263,6 @@ Replace the current white list of packages with new one.
 | Prop                     | Type                  |
 | ------------------------ | --------------------- |
 | **`cacheNotifications`** | <code>boolean</code>  |
-| **`packagesWhiteList`**  | <code>string[]</code> |
+| **`packagesWhitelist`**  | <code>string[]</code> |
 
 </docgen-api>
