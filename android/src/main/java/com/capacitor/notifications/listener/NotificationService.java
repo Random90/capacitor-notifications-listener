@@ -6,6 +6,9 @@ import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.util.Log;
 
+import java.util.ArrayList;
+import java.util.Objects;
+
 public class NotificationService extends NotificationListenerService {
     public static final String ACTION_RECEIVE      = "com.capacitor.notifications.listener.NOTIFICATION_RECEIVE_EVENT";
     public static final String ACTION_REMOVE      = "com.capacitor.notifications.listener.NOTIFICATION_REMOVE_EVENT";
@@ -21,6 +24,8 @@ public class NotificationService extends NotificationListenerService {
     // TODO hold the 'old' app context?
     public static NotificationsListenerPlugin.NotificationReceiver notificationReceiver;
     public static boolean isConnected = false;
+    // TODO: persist whitelist for autostart
+    public static ArrayList<String> packagesWhitelist = null;
 
     private static final String TAG = NotificationService.class.getSimpleName();
 
@@ -33,14 +38,18 @@ public class NotificationService extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-        Intent i = notificationToIntent(sbn, ACTION_RECEIVE);
-        sendBroadcast(i);
+        if (packagesWhitelist == null || existsInWhitelist(sbn)) {
+            Intent i = notificationToIntent(sbn, ACTION_RECEIVE);
+            sendBroadcast(i);
+        }
     }
 
     @Override
     public void onNotificationRemoved(StatusBarNotification sbn) {
-        Intent i = notificationToIntent(sbn, ACTION_REMOVE);
-        sendBroadcast(i);
+        if (packagesWhitelist == null || existsInWhitelist(sbn)) {
+            Intent i = notificationToIntent(sbn, ACTION_REMOVE);
+            sendBroadcast(i);
+        }
     }
 
     @Override
@@ -74,6 +83,9 @@ public class NotificationService extends NotificationListenerService {
 
         i.putExtra(ARG_TIME, n.when);
 
+        if (Objects.equals(action, ACTION_RECEIVE)) {
+            Log.d(TAG, "Received notification: " + text);
+        }
         return i;
     }
 
@@ -85,10 +97,18 @@ public class NotificationService extends NotificationListenerService {
         if (c == null) return new String[0];
         String[] out = new String[c.length];
         for (int i = 0; i < c.length; i++) {
-            Log.d(TAG, String.valueOf(c[i]));
             out[i] = charSequenceToString(c[i]);
         }
         return out;
+    }
+
+    private boolean existsInWhitelist(StatusBarNotification notification) {
+        String packageName = notification.getPackageName();
+        boolean exists = packagesWhitelist.contains(packageName);
+        if (!exists) {
+            Log.d(TAG, "Package not in whitelist: " + packageName);
+        }
+        return exists;
     }
 }
 

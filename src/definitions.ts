@@ -27,16 +27,17 @@ export interface NotificationsListenerPlugin {
   removeAllListeners(): Promise<void>;
   /**
    * Replace the current white list of packages with new one.
+   * send null to disable whitelist.
    */
   replacePackagesWhitelist(options: {
-    packagesWhitelist: string[];
+    packagesWhitelist: string[] | null;
   }): Promise<void>;
 }
 
 export interface ListenerOptions {
   cacheNotifications?: boolean;
-  // listen to notifications from specific packages. Improves performance.
-  packagesWhitelist?: string[];
+  // listen to notifications from specific packages. Improves performance
+  packagesWhitelist?: string[] | null;
 }
 
 export interface AndroidNotification {

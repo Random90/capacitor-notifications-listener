@@ -49,11 +49,11 @@ public class NotificationsListenerPlugin extends Plugin {
         Log.d(TAG, "Destroyed");
     }
 
+    // TODO: test if reinstalling the app will properly register new listener
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @PluginMethod
     public void startListening(PluginCall call) {
         Boolean cacheEnabledValue = call.getBoolean("cacheNotifications");
-        // TODO: persist whitelist for autostart
         ArrayList<String> packagesWhitelist = arrayFromPluginCall(call);
         if (packagesWhitelist != null) {
             Log.d(TAG, "Listening to packages: " + packagesWhitelist.toString());
@@ -61,7 +61,7 @@ public class NotificationsListenerPlugin extends Plugin {
 
         cacheEnabled = (cacheEnabledValue != null) ? cacheEnabledValue : false;
         if (NotificationService.notificationReceiver != null) {
-            Log.d(TAG, "NotificationReceiver already exists");
+            Log.d(TAG, "NotificationReceiver already exists, unregistering");
             NotificationService.notificationReceiver.unregister(getContext());
         }
         NotificationService.notificationReceiver = new NotificationReceiver(cacheEnabled, webViewActive, packagesWhitelist);
@@ -174,14 +174,13 @@ public class NotificationsListenerPlugin extends Plugin {
         public boolean isRegistered;
         private boolean cacheEnabled;
         private boolean webViewActive;
-        private ArrayList<String> packagesWhitelist;
 
         private NotificationReceiver(boolean cacheEnabled, boolean webViewActive, ArrayList<String> packagesWhitelist) {
             Log.d(TAG, "NotificationReceiver created");
             this.isRegistered = false;
             this.cacheEnabled = cacheEnabled;
             this.webViewActive = webViewActive;
-            this.packagesWhitelist = packagesWhitelist;
+            NotificationService.packagesWhitelist = packagesWhitelist;
         }
 
         /**
@@ -236,7 +235,7 @@ public class NotificationsListenerPlugin extends Plugin {
         }
 
         public void setPackagesWhitelist(ArrayList<String> packagesWhitelist) {
-            this.packagesWhitelist = packagesWhitelist;
+            NotificationService.packagesWhitelist = packagesWhitelist;
         }
 
         @Override
@@ -245,19 +244,17 @@ public class NotificationsListenerPlugin extends Plugin {
                 Log.w(TAG, "Unregistered receiver is still registered in Android. Hope it kills it");
                 return;
             }
-            if (packagesWhitelist != null && !existsInWhitelist(intent)) {
-                return;
-            }
             JSObject jo = parseNotification(intent);
             switch (Objects.requireNonNull(intent.getAction())) {
                 case NotificationService.ACTION_RECEIVE:
                     // log original intent
-                    Log.d(TAG, "Received notification: " + jo.toString());
                     if (cacheEnabled && !webViewActive) {
                         Log.d(TAG, "Caching notification");
                         persistentStorage.append(STORAGE_KEY, jo);
                         Log.d(TAG, "New cache size: " + persistentStorage.size(STORAGE_KEY));
                         return;
+                    } else if (!cacheEnabled && !webViewActive) {
+                        Log.d(TAG, "Cache disabled, not caching notification in bg");
                     }
                     notifyListeners(EVENT_NOTIFICATION_RECEIVED, jo);
                     break;
@@ -284,11 +281,6 @@ public class NotificationsListenerPlugin extends Plugin {
                 return null;
             }
             return jo;
-        }
-
-        private boolean existsInWhitelist(Intent intent) {
-            String packageName = intent.getStringExtra(NotificationService.ARG_PACKAGE);
-            return packagesWhitelist.contains(packageName);
         }
     }
 }

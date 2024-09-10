@@ -7,6 +7,10 @@ It is a replacement of [https://github.com/Alone2/capacitor-notificationlistener
 This plugin works on Android 14 and adds few additional features like persistent notifications caching.
 Tested on Capacitor v6.
 
+**Note: Plugin is in active development, bugs are to be expected, especially in background processing service.** 
+
+Background service autostart is TODO, right now it only works on reboot if you start your app manually. Caching works when main app is killed, but for now there is no prevention from android killing the service. Not happened to me during testing though. 
+
 ## Install
 
 ```bash
@@ -224,14 +228,15 @@ removeAllListeners() => Promise<void>
 ### replacePackagesWhitelist(...)
 
 ```typescript
-replacePackagesWhitelist(options: { packagesWhitelist: string[]; }) => Promise<void>
+replacePackagesWhitelist(options: { packagesWhitelist: string[] | null; }) => Promise<void>
 ```
 
 Replace the current white list of packages with new one.
+send null to disable whitelist.
 
-| Param         | Type                                          |
-| ------------- | --------------------------------------------- |
-| **`options`** | <code>{ packagesWhitelist: string[]; }</code> |
+| Param         | Type                                                  |
+| ------------- | ----------------------------------------------------- |
+| **`options`** | <code>{ packagesWhitelist: string[] \| null; }</code> |
 
 --------------------
 
@@ -260,9 +265,9 @@ Replace the current white list of packages with new one.
 
 #### ListenerOptions
 
-| Prop                     | Type                  |
-| ------------------------ | --------------------- |
-| **`cacheNotifications`** | <code>boolean</code>  |
-| **`packagesWhitelist`**  | <code>string[]</code> |
+| Prop                     | Type                          |
+| ------------------------ | ----------------------------- |
+| **`cacheNotifications`** | <code>boolean</code>          |
+| **`packagesWhitelist`**  | <code>string[] \| null</code> |
 
 </docgen-api>
