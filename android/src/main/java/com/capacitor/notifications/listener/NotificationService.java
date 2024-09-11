@@ -5,11 +5,15 @@ import android.content.Intent;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.util.Log;
-
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
 import java.util.ArrayList;
-import java.util.Objects;
+
+// TODO - autostart: persist whitelist and cachedEnabled bool on restart to continue listening. Service (at least on android 14 starts automatically)
 
 public class NotificationService extends NotificationListenerService {
+    public static final String STORAGE_KEY = "notificationsCache";
+
     public static final String ACTION_RECEIVE      = "com.capacitor.notifications.listener.NOTIFICATION_RECEIVE_EVENT";
     public static final String ACTION_REMOVE      = "com.capacitor.notifications.listener.NOTIFICATION_REMOVE_EVENT";
 
@@ -20,32 +24,42 @@ public class NotificationService extends NotificationListenerService {
     public static final String ARG_TEXTLINES = "notification_event_textlines";
     public static final String ARG_TIME = " notification_event_time";
 
-    // hacky singleton to keep the receiver instance across plugin restarts
-    // TODO hold the 'old' app context?
-    public static NotificationsListenerPlugin.NotificationReceiver notificationReceiver;
-    public static boolean isConnected = false;
-    // TODO: persist whitelist for autostart
-    public static ArrayList<String> packagesWhitelist = null;
-
     private static final String TAG = NotificationService.class.getSimpleName();
 
-    @Override
-    public void onDestroy() {
-        if (notificationReceiver != null) {
-            notificationReceiver.unregister(this);
-        }
-    }
+    public static NotificationsListenerPlugin.NotificationReceiver notificationReceiver;
+    // service connected to the android notification service
+    public static boolean isConnected = false;
+    // listening started by the webview app
+    // TODO: persist whitelist for autostart
+    public static ArrayList<String> packagesWhitelist = null;
+    public static SimpleStorage persistentStorage;
+    public static Plugin pluginInstance;
+    public static boolean cacheEnabled = false;
+    public static boolean webViewActive = false;
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-        if (packagesWhitelist == null || existsInWhitelist(sbn)) {
-            Intent i = notificationToIntent(sbn, ACTION_RECEIVE);
-            sendBroadcast(i);
+        Log.d(TAG, "Received notification: " + sbn.getNotification().extras.getCharSequence("android.text"));
+        if (packagesWhitelist != null && !existsInWhitelist(sbn)) return;
+        if ((notificationReceiver == null || !webViewActive) && cacheEnabled) {
+            persistentStorage.append(STORAGE_KEY, notificationToJSObject(sbn));
+            Log.d(TAG, "Notification cached. New size: " + persistentStorage.size(STORAGE_KEY));
+            return;
         }
+        if (notificationReceiver == null) {
+            Log.w(TAG, "NotificationReceiver not created and cache is disabled - notification skipped");
+            return;
+        }
+
+        Log.d(TAG, "Sending notification to webview");
+        Intent i = notificationToIntent(sbn, ACTION_RECEIVE);
+        sendBroadcast(i);
+
     }
 
     @Override
     public void onNotificationRemoved(StatusBarNotification sbn) {
+        if (notificationReceiver == null || !webViewActive) return;
         if (packagesWhitelist == null || existsInWhitelist(sbn)) {
             Intent i = notificationToIntent(sbn, ACTION_REMOVE);
             sendBroadcast(i);
@@ -82,11 +96,31 @@ public class NotificationService extends NotificationListenerService {
         i.putExtra(ARG_APPTITLE, charSequenceToString(apptitle));
 
         i.putExtra(ARG_TIME, n.when);
-
-        if (Objects.equals(action, ACTION_RECEIVE)) {
-            Log.d(TAG, "Received notification: " + text);
-        }
         return i;
+    }
+
+    private JSObject notificationToJSObject(StatusBarNotification sbn) {
+        JSObject jo = new JSObject();
+        Notification n = sbn.getNotification();
+
+        CharSequence pkg =  sbn.getPackageName();
+        jo.put("package", charSequenceToString(pkg));
+
+        CharSequence title =  n.tickerText;
+        jo.put("title", charSequenceToString(title));
+
+        CharSequence text =  n.extras.getCharSequence("android.text");
+        jo.put("text", charSequenceToString(text));
+
+        CharSequence[] textlines =  n.extras.getCharSequenceArray("android.textLines");
+        jo.put("textlines", charSequenceArrayToStringArray(textlines));
+
+        CharSequence apptitle  = n.extras.getCharSequence("android.title");
+        jo.put("apptitle", charSequenceToString(apptitle));
+
+        jo.put("time", n.when);
+
+        return jo;
     }
 
     private String charSequenceToString(CharSequence c) {

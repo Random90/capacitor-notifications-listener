@@ -32,44 +32,41 @@ public class NotificationsListenerPlugin extends Plugin {
     private static final String TAG = NotificationsListenerPlugin.class.getSimpleName();
     private static final String EVENT_NOTIFICATION_REMOVED = "notificationRemovedEvent";
     private static final String EVENT_NOTIFICATION_RECEIVED = "notificationReceivedEvent";
-    private static final String STORAGE_KEY = "notificationsCache";
 
-    private Boolean cacheEnabled = false;
-    private Boolean webViewActive = true;
-    private SimpleStorage persistentStorage;
+    private NotificationReceiver notificationReceiver = null;
 
     public void load() {
-        persistentStorage = new SimpleStorage(getContext());
         attachAppStateListener();
+        NotificationService.persistentStorage = new SimpleStorage(getContext());
+        NotificationService.pluginInstance = this;
     }
 
     @Override
     protected void handleOnDestroy() {
-        // TODO also remove listeners?
-        Log.d(TAG, "Destroyed");
+        getContext().unregisterReceiver(notificationReceiver);
+        NotificationService.notificationReceiver = null;
+        NotificationService.pluginInstance = null;
+        NotificationService.webViewActive = false;
+        Log.d(TAG, "Plugin Destroyed, NotificationReceiver unregistered");
+
     }
 
-    // TODO: test if reinstalling the app will properly register new listener
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @PluginMethod
     public void startListening(PluginCall call) {
         Boolean cacheEnabledValue = call.getBoolean("cacheNotifications");
         ArrayList<String> packagesWhitelist = arrayFromPluginCall(call);
-        if (packagesWhitelist != null) {
-            Log.d(TAG, "Listening to packages: " + packagesWhitelist.toString());
-        }
+        NotificationService.cacheEnabled = (cacheEnabledValue != null) ? cacheEnabledValue : false;
+        NotificationService.packagesWhitelist = packagesWhitelist;
 
-        cacheEnabled = (cacheEnabledValue != null) ? cacheEnabledValue : false;
-        if (NotificationService.notificationReceiver != null) {
-            Log.d(TAG, "NotificationReceiver already exists, unregistering");
-            NotificationService.notificationReceiver.unregister(getContext());
+        if (packagesWhitelist != null) {
+            Log.d(TAG, "Listening to packages: " + packagesWhitelist);
         }
-        NotificationService.notificationReceiver = new NotificationReceiver(cacheEnabled, webViewActive, packagesWhitelist);
         IntentFilter filter = new IntentFilter();
         filter.addAction(NotificationService.ACTION_RECEIVE);
         filter.addAction(NotificationService.ACTION_REMOVE);
-
-        NotificationService.notificationReceiver.register(getContext(), filter);
+        notificationReceiver = new NotificationReceiver(getContext(), filter);
+        NotificationService.notificationReceiver = notificationReceiver;
         call.resolve();
     }
 
@@ -94,18 +91,18 @@ public class NotificationsListenerPlugin extends Plugin {
 
     @PluginMethod
     public void stopListening(PluginCall call) {
-        if (NotificationService.notificationReceiver == null) {
+        if (notificationReceiver == null) {
             call.resolve();
             return;
         }
-        NotificationService.notificationReceiver.unregister(getContext());
+        getContext().unregisterReceiver(notificationReceiver);
         call.resolve();
     }
 
     @PluginMethod
     public void replacePackagesWhiteList(PluginCall call) {
         ArrayList<String> packagesWhitelist = arrayFromPluginCall(call);
-        NotificationService.notificationReceiver.setPackagesWhitelist(packagesWhitelist);
+        NotificationService.packagesWhitelist = packagesWhitelist;
         if (packagesWhitelist != null) {
             Log.d(TAG, "Listening to new packages: " + packagesWhitelist.toString());
         } else {
@@ -114,31 +111,13 @@ public class NotificationsListenerPlugin extends Plugin {
         call.resolve();
     }
 
-
-    private void attachAppStateListener() {
-        bridge.getApp().setStatusChangeListener((isActive) -> {
-            if (NotificationService.notificationReceiver != null) {
-                NotificationService.notificationReceiver.setWebViewActive(isActive);
-            }
-            if (isActive) {
-                webViewActive = true;
-
-                if (cacheEnabled) {
-                    restoreFromCache();
-                }
-            } else {
-                webViewActive = false;
-            }
-        });
-    }
-
     private void restoreFromCache() {
-        JSONArray persistedJSONArray = persistentStorage.retrieve(STORAGE_KEY);
+        JSONArray persistedJSONArray = NotificationService.persistentStorage.retrieve(NotificationService.STORAGE_KEY);
         if (persistedJSONArray == null) {
             Log.d(TAG, "No cached notifications to restore");
             return;
         }
-        Log.d(TAG, "Cache size: " + persistentStorage.size(STORAGE_KEY));
+        Log.d(TAG, "Cache size: " + NotificationService.persistentStorage.size(NotificationService.STORAGE_KEY));
         try {
             for (int i = 0; i < persistedJSONArray.length(); i++) {
                 JSONObject jo = persistedJSONArray.getJSONObject(i);
@@ -149,7 +128,18 @@ public class NotificationsListenerPlugin extends Plugin {
             Log.e(TAG, "Error restoring cached notifications");
             e.printStackTrace();
         }
-        persistentStorage.remove(STORAGE_KEY);
+        NotificationService.persistentStorage.remove(NotificationService.STORAGE_KEY);
+    }
+
+    private void attachAppStateListener() {
+        bridge.getApp().setStatusChangeListener((isActive) -> {
+            NotificationService.webViewActive = isActive;
+            // Restore cached notifications if the webview is unpaused, but not before webView starts the listener after killing
+            // restoreCachedNotifications() called from webview will handle that case.
+            if (isActive && NotificationService.cacheEnabled && NotificationService.notificationReceiver != null) {
+                restoreFromCache();
+            }
+        });
     }
 
     private ArrayList<String> arrayFromPluginCall(PluginCall call) {
@@ -171,91 +161,22 @@ public class NotificationsListenerPlugin extends Plugin {
     }
 
     public class NotificationReceiver extends BroadcastReceiver {
-        public boolean isRegistered;
-        private boolean cacheEnabled;
-        private boolean webViewActive;
 
-        private NotificationReceiver(boolean cacheEnabled, boolean webViewActive, ArrayList<String> packagesWhitelist) {
-            Log.d(TAG, "NotificationReceiver created");
-            this.isRegistered = false;
-            this.cacheEnabled = cacheEnabled;
-            this.webViewActive = webViewActive;
-            NotificationService.packagesWhitelist = packagesWhitelist;
-        }
-
-        /**
-         * @return see Context.registerReceiver(BroadcastReceiver,IntentFilter)
-         */
         @SuppressLint("UnspecifiedRegisterReceiverFlag")
-        public Intent register(Context context, IntentFilter filter) {
-            try {
-                if (!isRegistered) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                        return context.registerReceiver(this, filter);
-                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        return context.registerReceiver(this, filter, Context.RECEIVER_EXPORTED);
-                    }
-                }
-                return null;
-            } catch (Exception e) {
-                e.printStackTrace();
-                return null;
-            } finally {
-                isRegistered = true;
+        private NotificationReceiver(Context context, IntentFilter filter) {
+            Log.d(TAG, "NotificationReceiver created");
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(this, filter);
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(this, filter, Context.RECEIVER_EXPORTED);
             }
-        }
-
-        /**
-         * @return true if was registered else false
-         */
-        public boolean unregister(Context context) {
-            // TODO hold the weak reference to old context in service, so the receiver can be properly removed.
-            // currently after killing the app context is new. At least reference to the receiver is kept in the service, so unregistering it
-            // stops sending data to the WebView
-            return isRegistered
-                    && unregisterInternal(context);
-        }
-
-        private boolean unregisterInternal(Context context) {
-            try {
-                context.unregisterReceiver(this);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            isRegistered = false;
-            return true;
-        }
-
-        public void setCacheEnabled(boolean cacheEnabled) {
-            this.cacheEnabled = cacheEnabled;
-        }
-
-        public void setWebViewActive(boolean webViewActive) {
-            this.webViewActive = webViewActive;
-        }
-
-        public void setPackagesWhitelist(ArrayList<String> packagesWhitelist) {
-            NotificationService.packagesWhitelist = packagesWhitelist;
         }
 
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (!isRegistered) {
-                Log.w(TAG, "Unregistered receiver is still registered in Android. Hope it kills it");
-                return;
-            }
             JSObject jo = parseNotification(intent);
             switch (Objects.requireNonNull(intent.getAction())) {
                 case NotificationService.ACTION_RECEIVE:
-                    // log original intent
-                    if (cacheEnabled && !webViewActive) {
-                        Log.d(TAG, "Caching notification");
-                        persistentStorage.append(STORAGE_KEY, jo);
-                        Log.d(TAG, "New cache size: " + persistentStorage.size(STORAGE_KEY));
-                        return;
-                    } else if (!cacheEnabled && !webViewActive) {
-                        Log.d(TAG, "Cache disabled, not caching notification in bg");
-                    }
                     notifyListeners(EVENT_NOTIFICATION_RECEIVED, jo);
                     break;
                 case NotificationService.ACTION_REMOVE:
