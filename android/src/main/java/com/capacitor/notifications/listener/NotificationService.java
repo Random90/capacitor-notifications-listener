@@ -7,15 +7,20 @@ import android.service.notification.StatusBarNotification;
 import android.util.Log;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
+
+import org.json.JSONArray;
+
 import java.util.ArrayList;
 
 // TODO - autostart: persist whitelist and cachedEnabled bool on restart to continue listening. Service (at least on android 14 starts automatically)
+// TODO - use DataStore or SQLite for persistent storage
 
 public class NotificationService extends NotificationListenerService {
+
     public static final String STORAGE_KEY = "notificationsCache";
 
-    public static final String ACTION_RECEIVE      = "com.capacitor.notifications.listener.NOTIFICATION_RECEIVE_EVENT";
-    public static final String ACTION_REMOVE      = "com.capacitor.notifications.listener.NOTIFICATION_REMOVE_EVENT";
+    public static final String ACTION_RECEIVE = "com.capacitor.notifications.listener.NOTIFICATION_RECEIVE_EVENT";
+    public static final String ACTION_REMOVE = "com.capacitor.notifications.listener.NOTIFICATION_REMOVE_EVENT";
 
     public static final String ARG_PACKAGE = "notification_event_package";
     public static final String ARG_TITLE = "notification_event_title";
@@ -54,7 +59,6 @@ public class NotificationService extends NotificationListenerService {
         Log.d(TAG, "Sending notification to webview");
         Intent i = notificationToIntent(sbn, ACTION_RECEIVE);
         sendBroadcast(i);
-
     }
 
     @Override
@@ -80,19 +84,19 @@ public class NotificationService extends NotificationListenerService {
         Intent i = new Intent(action);
         Notification n = sbn.getNotification();
 
-        CharSequence pkg =  sbn.getPackageName();
+        CharSequence pkg = sbn.getPackageName();
         i.putExtra(ARG_PACKAGE, charSequenceToString(pkg));
 
-        CharSequence title =  n.tickerText;
+        CharSequence title = n.tickerText;
         i.putExtra(ARG_TITLE, charSequenceToString(title));
 
-        CharSequence text =  n.extras.getCharSequence("android.text");
+        CharSequence text = n.extras.getCharSequence("android.text");
         i.putExtra(ARG_TEXT, charSequenceToString(text));
 
-        CharSequence[] textlines =  n.extras.getCharSequenceArray("android.textLines");
+        CharSequence[] textlines = n.extras.getCharSequenceArray("android.textLines");
         i.putExtra(ARG_TEXTLINES, charSequenceArrayToStringArray(textlines));
 
-        CharSequence apptitle  = n.extras.getCharSequence("android.title");
+        CharSequence apptitle = n.extras.getCharSequence("android.title");
         i.putExtra(ARG_APPTITLE, charSequenceToString(apptitle));
 
         i.putExtra(ARG_TIME, n.when);
@@ -103,19 +107,20 @@ public class NotificationService extends NotificationListenerService {
         JSObject jo = new JSObject();
         Notification n = sbn.getNotification();
 
-        CharSequence pkg =  sbn.getPackageName();
+        CharSequence pkg = sbn.getPackageName();
         jo.put("package", charSequenceToString(pkg));
 
-        CharSequence title =  n.tickerText;
+        CharSequence title = n.tickerText;
         jo.put("title", charSequenceToString(title));
 
-        CharSequence text =  n.extras.getCharSequence("android.text");
+        CharSequence text = n.extras.getCharSequence("android.text");
         jo.put("text", charSequenceToString(text));
 
-        CharSequence[] textlines =  n.extras.getCharSequenceArray("android.textLines");
-        jo.put("textlines", charSequenceArrayToStringArray(textlines));
+        // TODO fix textlines not converted properly to JSArray
+        CharSequence[] textlines = n.extras.getCharSequenceArray("android.textLines");
+        jo.put("textlines", stringArrayToJSONArray(charSequenceArrayToStringArray(textlines)));
 
-        CharSequence apptitle  = n.extras.getCharSequence("android.title");
+        CharSequence apptitle = n.extras.getCharSequence("android.title");
         jo.put("apptitle", charSequenceToString(apptitle));
 
         jo.put("time", n.when);
@@ -124,7 +129,7 @@ public class NotificationService extends NotificationListenerService {
     }
 
     private String charSequenceToString(CharSequence c) {
-        return  (c == null ) ? "" : String.valueOf(c);
+        return (c == null) ? "" : String.valueOf(c);
     }
 
     private String[] charSequenceArrayToStringArray(CharSequence[] c) {
@@ -136,6 +141,14 @@ public class NotificationService extends NotificationListenerService {
         return out;
     }
 
+    private JSONArray stringArrayToJSONArray(String[] array) {
+        JSONArray jsonArray = new JSONArray();
+        for (String item : array) {
+            jsonArray.put(item);
+        }
+        return jsonArray;
+    }
+
     private boolean existsInWhitelist(StatusBarNotification notification) {
         String packageName = notification.getPackageName();
         boolean exists = packagesWhitelist.contains(packageName);
@@ -145,5 +158,3 @@ public class NotificationService extends NotificationListenerService {
         return exists;
     }
 }
-
-
