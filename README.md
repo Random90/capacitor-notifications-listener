@@ -9,7 +9,7 @@ Tested on Capacitor v6.
 
 **Note: Plugin is in active development, bugs are to be expected, especially in background processing service.** 
 
-Background service autostart is TODO, right now it only works on reboot if you start your app manually. Caching works when main app is killed, but for now there is no prevention from android killing the service. Not happened to me during testing though. 
+Since version 0.4 background service is more robust and should withstand reboots and app kills, but I've tested it only on few devices with Android 15 to 12.
 
 ## Install
 

@@ -9,10 +9,7 @@ export interface NotificationsListenerPlugin {
     eventName: 'notificationReceivedEvent',
     listenerFunc: (info: AndroidNotification) => void,
   ): Promise<PluginListenerHandle>;
-  /**
-   *
-   * @param cacheNotifications If true, the plugin will cache all RECEIVED notifications that and emit them when the webview is in the foreground.
-   */
+
   startListening(options: ListenerOptions): Promise<void>;
   /**
    * Call this after attaching listeners and after starting listening. If nothing is cached, nothing will happen.
@@ -35,6 +32,7 @@ export interface NotificationsListenerPlugin {
 }
 
 export interface ListenerOptions {
+  // If true, the plugin will cache all RECEIVED notifications that and emit them when the webview is in the foreground.
   cacheNotifications?: boolean;
   // listen to notifications from specific packages. Improves performance
   packagesWhitelist?: string[] | null;
@@ -43,7 +41,7 @@ export interface ListenerOptions {
 export interface AndroidNotification {
   apptitle: string;
   text: string;
-  textlines: string[];
+  textlines?: string[];
   title: string;
   time: number; // timestamp
   package: string;
