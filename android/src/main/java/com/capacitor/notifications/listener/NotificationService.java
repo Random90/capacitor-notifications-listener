@@ -11,13 +11,17 @@ import com.getcapacitor.Plugin;
 import org.json.JSONArray;
 
 import java.util.ArrayList;
+import java.util.Objects;
+import java.util.UUID;
 
 // TODO - autostart: persist whitelist and cachedEnabled bool on restart to continue listening. Service (at least on android 14 starts automatically)
 // TODO - use DataStore or SQLite for persistent storage
 
 public class NotificationService extends NotificationListenerService {
 
-    public static final String STORAGE_KEY = "notificationsCache";
+    public static final String NOTIFICATIONS_STORAGE_KEY = "notificationsCache";
+    public static final String CACHE_ENABLED_STORAGE_KEY = "notificationsCacheEnabled";
+    public static final String WHITE_LIST_STORAGE_KEY = "notificationsWhitelist";
 
     public static final String ACTION_RECEIVE = "com.capacitor.notifications.listener.NOTIFICATION_RECEIVE_EVENT";
     public static final String ACTION_REMOVE = "com.capacitor.notifications.listener.NOTIFICATION_REMOVE_EVENT";
@@ -35,20 +39,50 @@ public class NotificationService extends NotificationListenerService {
     // service connected to the android notification service
     public static boolean isConnected = false;
     // listening started by the webview app
-    // TODO: persist whitelist for autostart
     public static ArrayList<String> packagesWhitelist = null;
-    public static SimpleStorage persistentStorage;
     public static Plugin pluginInstance;
-    public static boolean cacheEnabled = false;
+    public static Boolean cacheEnabled = null;
     public static boolean webViewActive = false;
+
+    private SimpleStorage persistentStorage;
+    private StatusBarNotification lastNotification;
+
+    private final UUID uuid;
+
+    public NotificationService() {
+        uuid = UUID.randomUUID();
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        Log.d(TAG, "Spawning NotificationService with UUID: " + uuid);
+        persistentStorage = new SimpleStorage(getApplicationContext());
+        packagesWhitelist = persistentStorage.retrieveArrayList(WHITE_LIST_STORAGE_KEY);
+    }
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
+        Log.d(TAG, "Receiver ID" + this.uuid + " Whitelist size: " + packagesWhitelist.size() + " Receiver: " + notificationReceiver + " WebViewActive: " + webViewActive);
         Log.d(TAG, "Received notification: " + sbn.getNotification().extras.getCharSequence("android.text"));
+        // workaround for duplicate notifications on older android versions after app is killed by force
+        if (lastNotification != null)
+        {
+            boolean sameText = Objects.equals(lastNotification.getNotification().extras.getCharSequence("android.text"), sbn.getNotification().extras.getCharSequence("android.text"));
+            boolean sameTime = lastNotification.getNotification().when == sbn.getNotification().when;
+            if (sameText && sameTime) {
+                Log.d(TAG, "Notification already received - skipping");
+                return;
+            }
+        }
+        lastNotification = sbn;
         if (packagesWhitelist != null && !existsInWhitelist(sbn)) return;
+        if (cacheEnabled == null) {
+            cacheEnabled = Boolean.parseBoolean(persistentStorage.get(CACHE_ENABLED_STORAGE_KEY));
+        }
         if ((notificationReceiver == null || !webViewActive) && cacheEnabled) {
-            persistentStorage.append(STORAGE_KEY, notificationToJSObject(sbn));
-            Log.d(TAG, "Notification cached. New size: " + persistentStorage.size(STORAGE_KEY));
+            persistentStorage.append(NOTIFICATIONS_STORAGE_KEY, notificationToJSObject(sbn));
+            Log.d(TAG, "Notification cached. New size: " + persistentStorage.size(NOTIFICATIONS_STORAGE_KEY));
             return;
         }
         if (notificationReceiver == null) {

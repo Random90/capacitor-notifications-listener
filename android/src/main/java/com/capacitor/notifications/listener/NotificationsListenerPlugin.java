@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Objects;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 @CapacitorPlugin(
@@ -34,31 +35,31 @@ public class NotificationsListenerPlugin extends Plugin {
     private static final String EVENT_NOTIFICATION_RECEIVED = "notificationReceivedEvent";
 
     private NotificationReceiver notificationReceiver = null;
+    private SimpleStorage persistentStorage = null;
 
     public void load() {
         attachAppStateListener();
-        NotificationService.persistentStorage = new SimpleStorage(getContext());
+        persistentStorage = new SimpleStorage(getContext());
         NotificationService.pluginInstance = this;
     }
 
     @Override
     protected void handleOnDestroy() {
-        getContext().unregisterReceiver(notificationReceiver);
-        NotificationService.notificationReceiver = null;
-        NotificationService.pluginInstance = null;
-        NotificationService.webViewActive = false;
+        this.pluginCleanup();
         Log.d(TAG, "Plugin Destroyed, NotificationReceiver unregistered");
-
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @PluginMethod
-    public void startListening(PluginCall call) {
+    public void startListening(PluginCall call) throws JSONException {
         Boolean cacheEnabledValue = call.getBoolean("cacheNotifications");
         ArrayList<String> packagesWhitelist = arrayFromPluginCall(call);
         NotificationService.cacheEnabled = (cacheEnabledValue != null) ? cacheEnabledValue : false;
         NotificationService.packagesWhitelist = packagesWhitelist;
-
+        persistentStorage.set(NotificationService.CACHE_ENABLED_STORAGE_KEY, String.valueOf(cacheEnabledValue));
+        if (packagesWhitelist != null) {
+            this.persistWhitelist(packagesWhitelist);
+        }
         if (packagesWhitelist != null) {
             Log.d(TAG, "Listening to packages: " + packagesWhitelist);
         }
@@ -100,24 +101,26 @@ public class NotificationsListenerPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void replacePackagesWhiteList(PluginCall call) {
+    public void replacePackagesWhiteList(PluginCall call) throws JSONException {
         ArrayList<String> packagesWhitelist = arrayFromPluginCall(call);
         NotificationService.packagesWhitelist = packagesWhitelist;
         if (packagesWhitelist != null) {
+            this.persistWhitelist(packagesWhitelist);
             Log.d(TAG, "Listening to new packages: " + packagesWhitelist.toString());
         } else {
             Log.d(TAG, "Whitelist disabled");
+            persistentStorage.remove(NotificationService.WHITE_LIST_STORAGE_KEY);
         }
         call.resolve();
     }
 
     private void restoreFromCache() {
-        JSONArray persistedJSONArray = NotificationService.persistentStorage.retrieve(NotificationService.STORAGE_KEY);
+        JSONArray persistedJSONArray = persistentStorage.retrieve(NotificationService.NOTIFICATIONS_STORAGE_KEY);
         if (persistedJSONArray == null) {
             Log.d(TAG, "No cached notifications to restore");
             return;
         }
-        Log.d(TAG, "Cache size: " + NotificationService.persistentStorage.size(NotificationService.STORAGE_KEY));
+        Log.d(TAG, "Cache size: " + persistentStorage.size(NotificationService.NOTIFICATIONS_STORAGE_KEY));
         try {
             for (int i = 0; i < persistedJSONArray.length(); i++) {
                 JSONObject jo = persistedJSONArray.getJSONObject(i);
@@ -128,7 +131,7 @@ public class NotificationsListenerPlugin extends Plugin {
             Log.e(TAG, "Error restoring cached notifications");
             e.printStackTrace();
         }
-        NotificationService.persistentStorage.remove(NotificationService.STORAGE_KEY);
+        persistentStorage.remove(NotificationService.NOTIFICATIONS_STORAGE_KEY);
     }
 
     private void attachAppStateListener() {
@@ -136,7 +139,7 @@ public class NotificationsListenerPlugin extends Plugin {
             NotificationService.webViewActive = isActive;
             // Restore cached notifications if the webview is unpaused, but not before webView starts the listener after killing
             // restoreCachedNotifications() called from webview will handle that case.
-            if (isActive && NotificationService.cacheEnabled && NotificationService.notificationReceiver != null) {
+            if (isActive && NotificationService.cacheEnabled != null && NotificationService.cacheEnabled && NotificationService.notificationReceiver != null) {
                 restoreFromCache();
             }
         });
@@ -158,6 +161,25 @@ public class NotificationsListenerPlugin extends Plugin {
             return null;
         }
         return list;
+    }
+
+    private void persistWhitelist(ArrayList<String> packagesWhitelist) {
+        JSONArray jsonArrayWhitelist = new JSONArray(packagesWhitelist);
+        persistentStorage.set(NotificationService.WHITE_LIST_STORAGE_KEY, jsonArrayWhitelist.toString());
+    }
+
+    private void pluginCleanup() {
+        NotificationService.pluginInstance = null;
+        NotificationService.webViewActive = false;
+        if (NotificationService.notificationReceiver == null) {
+            return;
+        }
+        try {
+            getContext().unregisterReceiver(notificationReceiver);
+        } catch (Exception e) {
+            Log.e(TAG, "Error unregistering NotificationReceiver", e);
+        }
+        NotificationService.notificationReceiver = null;
     }
 
     public class NotificationReceiver extends BroadcastReceiver {

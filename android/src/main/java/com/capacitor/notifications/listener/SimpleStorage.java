@@ -8,6 +8,8 @@ import com.getcapacitor.JSObject;
 
 import org.json.JSONArray;
 import org.json.JSONException;
+
+import java.util.ArrayList;
 import java.util.Set;
 
 public class SimpleStorage {
@@ -40,6 +42,21 @@ public class SimpleStorage {
         return jsonString != null ? deserializeList(jsonString) : null;
     }
 
+    public ArrayList<String> retrieveArrayList(String whiteListStorageKey) {
+        JSONArray jsonArray = retrieve(whiteListStorageKey);
+        ArrayList<String> list = new ArrayList<>();
+        if (jsonArray != null) {
+            for (int i = 0; i < jsonArray.length(); i++) {
+                try {
+                    list.add(jsonArray.getString(i));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return list;
+    }
+
     public Number size(String key) {
         String jsonString = get(key);
         return jsonString != null ? deserializeList(jsonString).length() : 0;
@@ -49,13 +66,14 @@ public class SimpleStorage {
         executeOperation(editor -> editor.remove(key));
     }
 
-    private String get(String key) {
+    public void set(String key, String value) {
+        executeOperation(editor -> editor.putString(key, value));
+    }
+
+    public String get(String key) {
         return preferences.getString(key, null);
     }
 
-    private void set(String key, String value) {
-        executeOperation(editor -> editor.putString(key, value));
-    }
 
     private Set<String> keys() {
         return preferences.getAll().keySet();
