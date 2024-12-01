@@ -63,8 +63,9 @@ public class NotificationService extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-        Log.d(TAG, "Receiver ID" + this.uuid + " Whitelist size: " + packagesWhitelist.size() + " Receiver: " + notificationReceiver + " WebViewActive: " + webViewActive);
+        Log.d(TAG, "Service ID" + this.uuid + " Whitelist size: " + packagesWhitelist.size() + " Receiver: " + notificationReceiver + " WebViewActive: " + webViewActive);
         Log.d(TAG, "Received notification: " + sbn.getNotification().extras.getCharSequence("android.text"));
+        if (!existsInWhitelist(sbn)) return;
         // workaround for duplicate notifications on older android versions after app is killed by force
         if (lastNotification != null)
         {
@@ -76,7 +77,6 @@ public class NotificationService extends NotificationListenerService {
             }
         }
         lastNotification = sbn;
-        if (packagesWhitelist != null && !existsInWhitelist(sbn)) return;
         if (cacheEnabled == null) {
             cacheEnabled = Boolean.parseBoolean(persistentStorage.get(CACHE_ENABLED_STORAGE_KEY));
         }
@@ -185,9 +185,12 @@ public class NotificationService extends NotificationListenerService {
 
     private boolean existsInWhitelist(StatusBarNotification notification) {
         String packageName = notification.getPackageName();
+        Log.d(TAG, "Checking package: " + packageName);
         boolean exists = packagesWhitelist.contains(packageName);
+        Log.d(TAG, "Package in whitelist: " + packagesWhitelist);
+        Log.d(TAG, "Exists: " + exists);
         if (!exists) {
-            Log.d(TAG, "Package not in whitelist: " + packageName);
+            Log.d(TAG, "Package not in whitelist, skipping");
         }
         return exists;
     }
