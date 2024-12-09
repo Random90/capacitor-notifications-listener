@@ -26,9 +26,7 @@ export interface NotificationsListenerPlugin {
    * Replace the current white list of packages with new one.
    * send null to disable whitelist.
    */
-  replacePackagesWhitelist(options: {
-    packagesWhitelist: string[] | null;
-  }): Promise<void>;
+  replacePackagesWhitelist(options: { packagesWhitelist: string[] | null }): Promise<void>;
 }
 
 export interface ListenerOptions {

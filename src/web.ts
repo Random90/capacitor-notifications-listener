@@ -1,17 +1,10 @@
 // browser can't read your notifications.
 import { WebPlugin } from '@capacitor/core';
 
-import type {
-  AndroidNotification,
-  NotificationsListenerPlugin,
-} from './definitions';
+import type { AndroidNotification, NotificationsListenerPlugin } from './definitions';
 
-export class NotificationsListenerWeb
-  extends WebPlugin
-  implements NotificationsListenerPlugin
-{
-  readonly errorMessage =
-    'Method will never be implemented. Whose notifications you want to read?';
+export class NotificationsListenerWeb extends WebPlugin implements NotificationsListenerPlugin {
+  readonly errorMessage = 'Method will never be implemented. Whose notifications you want to read?';
   attachListener(
     eventName: 'notificationRemovedEvent',
     callback: (info: AndroidNotification) => void,
