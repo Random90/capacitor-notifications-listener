@@ -26,9 +26,8 @@
     "native"
   ],
   "scripts": {
-    "verify": "npm run verify:android && npm run verify:web",
+    "verify": "npm run verify:android",
     "verify:android": "cd android && ./gradlew clean build test && cd ..",
-    "verify:web": "npm run build",
     "lint": "npm run eslint && npm run prettier -- --check && npm run swiftlint -- lint",
     "fmt": "npm run eslint -- --fix && npm run prettier -- --write && npm run swiftlint -- --fix --format",
     "eslint": "eslint . --ext ts",
@@ -40,17 +39,18 @@
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
-    "@capacitor/android": "^6.0.0",
-    "@capacitor/core": "^6.0.0",
-    "@capacitor/docgen": "^0.2.2",
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/docgen": "^0.3.0",
     "@ionic/eslint-config": "^0.4.0",
-    "@ionic/prettier-config": "^1.0.1",
+    "@ionic/prettier-config": "^4.0.0",
+    "@types/node": "^22.10.1",
     "eslint": "^8.57.0",
-    "prettier": "~2.3.0",
-    "prettier-plugin-java": "~1.0.2",
-    "rimraf": "^3.0.2",
+    "prettier": "~3.4.2",
+    "prettier-plugin-java": "~2.6.5",
+    "rimraf": "^6.0.1",
     "rollup": "^2.79.2",
-    "typescript": "~4.1.5"
+    "typescript": "~5.7.2"
   },
   "peerDependencies": {
     "@capacitor/core": "^6.0.0"
