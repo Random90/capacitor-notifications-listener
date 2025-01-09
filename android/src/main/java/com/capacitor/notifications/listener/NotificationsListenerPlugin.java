@@ -101,7 +101,7 @@ public class NotificationsListenerPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void replacePackagesWhiteList(PluginCall call) throws JSONException {
+    public void replacePackagesWhitelist(PluginCall call) {
         ArrayList<String> packagesWhitelist = arrayFromPluginCall(call);
         NotificationService.packagesWhitelist = packagesWhitelist;
         if (packagesWhitelist != null) {
