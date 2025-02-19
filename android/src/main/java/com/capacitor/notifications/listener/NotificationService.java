@@ -63,7 +63,7 @@ public class NotificationService extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-        Log.d(TAG, "Service ID" + this.uuid + " Whitelist size: " + packagesWhitelist.size() + " Receiver: " + notificationReceiver + " WebViewActive: " + webViewActive);
+        Log.d(TAG, "Service ID" + this.uuid + " Whitelist size: " + (packagesWhitelist != null ? packagesWhitelist.size() : 0) + " Receiver: " + notificationReceiver + " WebViewActive: " + webViewActive);
         Log.d(TAG, "Received notification: " + sbn.getNotification().extras.getCharSequence("android.text"));
         if (!existsInWhitelist(sbn)) return;
         // workaround for duplicate notifications on older android versions after app is killed by force
@@ -186,7 +186,7 @@ public class NotificationService extends NotificationListenerService {
     private boolean existsInWhitelist(StatusBarNotification notification) {
         String packageName = notification.getPackageName();
         Log.d(TAG, "Checking package: " + packageName);
-        boolean exists = packagesWhitelist.contains(packageName);
+        boolean exists = (packagesWhitelist != null && packagesWhitelist.contains(packageName));
         Log.d(TAG, "Package in whitelist: " + packagesWhitelist);
         Log.d(TAG, "Exists: " + exists);
         if (!exists) {
