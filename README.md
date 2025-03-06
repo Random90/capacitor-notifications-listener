@@ -5,7 +5,7 @@ Plugin for reading all android notifications in capacitor. With this plugin you 
 It is a replacement of [https://github.com/Alone2/capacitor-notificationlistener](https://github.com/Alone2/capacitor-notificationlistener), that was archived due to lack of updates. 
 
 This plugin works on Android 15 and adds few additional features like persistent notifications caching.
-Tested on Capacitor v6.
+Tested on Capacitor v7.
 
 **Note: Plugin is in active development, bugs are to be expected, especially in background processing service.** 
 
