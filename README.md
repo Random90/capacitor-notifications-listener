@@ -9,7 +9,7 @@ Tested on Capacitor v7.
 
 **Note: Plugin is in active development, bugs are to be expected, especially in background processing service.** 
 
-Since version 0.4 background service is more robust and should withstand reboots and app kills, but I've tested it only on few devices with Android 15 to 12.
+Since version 0.4 background service is more robust and should withstand reboots and app kills, but I've tested it only on few devices with Android 16 to 12.
 
 ## Install
 
