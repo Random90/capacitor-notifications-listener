@@ -109,6 +109,18 @@ Next, when your aplication resumes or starts, call this method and the plugin wi
 systemNotificationListener.restoreCachedNotifications();
 ```
 
+### Cache access
+You can provide a custom storage group name when starting the listener. This way you can access the cached notifications from your app code if needed.
+Especially useful for BackgroundRunner as it uses specific key that cannot be changed at runtime.
+```TypeScript 
+systemNotificationListener.startListening({ storageGroupName: true }); 
+```
+The default storage group name is `CapacitorStorage`.
+#### Keys used by the plugin
+- `notificationsCache`
+- `notificationsCacheEnabled`
+- `packagesWhitelist`
+
 ## API
 
 <docgen-index>
@@ -269,5 +281,6 @@ send null to disable whitelist.
 | ------------------------ | ----------------------------- |
 | **`cacheNotifications`** | <code>boolean</code>          |
 | **`packagesWhitelist`**  | <code>string[] \| null</code> |
+| **`storageGroupName`**   | <code>string \| null</code>   |
 
 </docgen-api>

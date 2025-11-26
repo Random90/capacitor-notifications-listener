@@ -34,6 +34,8 @@ export interface ListenerOptions {
   cacheNotifications?: boolean;
   // listen to notifications from specific packages. Improves performance
   packagesWhitelist?: string[] | null;
+  // set Capacitor Preferences storage group name. Useful for accessing data from BackgroundRunner
+  storageGroupName?: string | null;
 }
 
 export interface AndroidNotification {

@@ -43,8 +43,7 @@ public class NotificationService extends NotificationListenerService {
     public static Plugin pluginInstance;
     public static Boolean cacheEnabled = null;
     public static boolean webViewActive = false;
-
-    private SimpleStorage persistentStorage;
+    public static SimpleStorage persistentStorage;
     private StatusBarNotification lastNotification;
 
     private final UUID uuid;
@@ -57,12 +56,21 @@ public class NotificationService extends NotificationListenerService {
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "Spawning NotificationService with UUID: " + uuid);
-        persistentStorage = new SimpleStorage(getApplicationContext());
-        packagesWhitelist = persistentStorage.retrieveArrayList(WHITE_LIST_STORAGE_KEY);
+    }
+
+    public static void init(SimpleStorage storage, Boolean cachedEnabled, ArrayList<String> whiteList, NotificationsListenerPlugin.NotificationReceiver receiver) {
+        persistentStorage = storage;
+        packagesWhitelist = whiteList;
+        cacheEnabled = cachedEnabled;
+        notificationReceiver = receiver;
     }
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
+        if (persistentStorage == null || notificationReceiver == null) {
+            Log.d(TAG, "Service not initialized yet - skipping notification");
+            return;
+        }
         Log.d(TAG, "Service ID" + this.uuid + " Whitelist size: " + (packagesWhitelist != null ? packagesWhitelist.size() : 0) + " Receiver: " + notificationReceiver + " WebViewActive: " + webViewActive);
         Log.d(TAG, "Received notification: " + sbn.getNotification().extras.getCharSequence("android.text"));
         if (!existsInWhitelist(sbn)) return;

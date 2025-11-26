@@ -39,7 +39,6 @@ public class NotificationsListenerPlugin extends Plugin {
 
     public void load() {
         attachAppStateListener();
-        persistentStorage = new SimpleStorage(getContext());
         NotificationService.pluginInstance = this;
     }
 
@@ -53,9 +52,25 @@ public class NotificationsListenerPlugin extends Plugin {
     @PluginMethod
     public void startListening(PluginCall call) throws JSONException {
         Boolean cacheEnabledValue = call.getBoolean("cacheNotifications");
+        String storageGroupName = call.getString("storageGroupName");
         ArrayList<String> packagesWhitelist = arrayFromPluginCall(call);
-        NotificationService.cacheEnabled = (cacheEnabledValue != null) ? cacheEnabledValue : false;
-        NotificationService.packagesWhitelist = packagesWhitelist;
+        persistentStorage = new SimpleStorage(getContext(), storageGroupName);
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(NotificationService.ACTION_RECEIVE);
+        filter.addAction(NotificationService.ACTION_REMOVE);
+        notificationReceiver = new NotificationReceiver(getContext(), filter);
+
+        NotificationService.init(
+                persistentStorage,
+                (cacheEnabledValue != null) ? cacheEnabledValue : false,
+                packagesWhitelist,
+                notificationReceiver
+        );
+
+        if (storageGroupName != null) {
+            Log.d(TAG, "Using custom storage group: " + storageGroupName);
+        }
+
         persistentStorage.set(NotificationService.CACHE_ENABLED_STORAGE_KEY, String.valueOf(cacheEnabledValue));
         if (packagesWhitelist != null) {
             this.persistWhitelist(packagesWhitelist);
@@ -63,11 +78,6 @@ public class NotificationsListenerPlugin extends Plugin {
         if (packagesWhitelist != null) {
             Log.d(TAG, "Listening to packages: " + packagesWhitelist);
         }
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(NotificationService.ACTION_RECEIVE);
-        filter.addAction(NotificationService.ACTION_REMOVE);
-        notificationReceiver = new NotificationReceiver(getContext(), filter);
-        NotificationService.notificationReceiver = notificationReceiver;
         call.resolve();
     }
 
@@ -171,6 +181,7 @@ public class NotificationsListenerPlugin extends Plugin {
     private void pluginCleanup() {
         NotificationService.pluginInstance = null;
         NotificationService.webViewActive = false;
+        NotificationService.persistentStorage = null;
         if (NotificationService.notificationReceiver == null) {
             return;
         }
