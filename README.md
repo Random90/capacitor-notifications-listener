@@ -113,7 +113,7 @@ systemNotificationListener.restoreCachedNotifications();
 You can provide a custom storage group name when starting the listener. This way you can access the cached notifications from your app code if needed.
 Especially useful for BackgroundRunner as it uses specific key that cannot be changed at runtime.
 ```TypeScript 
-systemNotificationListener.startListening({ storageGroupName: true }); 
+systemNotificationListener.startListening({ storageGroupName: 'YourCustomKey' }); 
 ```
 The default storage group name is `CapacitorStorage`.
 #### Keys used by the plugin
