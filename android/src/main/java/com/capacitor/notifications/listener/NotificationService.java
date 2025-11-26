@@ -67,8 +67,8 @@ public class NotificationService extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-        if (persistentStorage == null || notificationReceiver == null) {
-            Log.d(TAG, "Service not initialized yet - skipping notification");
+        if (persistentStorage == null) {
+            Log.w(TAG, "Persistent storage not initialized - notification skipped");
             return;
         }
         Log.d(TAG, "Service ID" + this.uuid + " Whitelist size: " + (packagesWhitelist != null ? packagesWhitelist.size() : 0) + " Receiver: " + notificationReceiver + " WebViewActive: " + webViewActive);

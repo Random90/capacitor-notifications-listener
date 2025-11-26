@@ -3,7 +3,6 @@ package com.capacitor.notifications.listener;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Log;
 
 import com.getcapacitor.JSObject;
 
@@ -15,6 +14,8 @@ import java.util.Set;
 
 public class SimpleStorage {
 
+    public String DEFAULT_GROUP_NAME = "CapacitorStorage";
+    public String groupName;
     private final SharedPreferences preferences;
 
     private interface PreferencesOperation {
@@ -25,8 +26,8 @@ public class SimpleStorage {
         this(context, null);
     }
     SimpleStorage(Context context, String storageGroupName) {
-        String name = (storageGroupName == null || storageGroupName.isEmpty()) ? "CapacitorStorage" : storageGroupName;
-        this.preferences = context.getSharedPreferences(name, Activity.MODE_PRIVATE);
+        groupName = (storageGroupName == null || storageGroupName.isEmpty()) ? DEFAULT_GROUP_NAME : storageGroupName;
+        this.preferences = context.getSharedPreferences(groupName, Activity.MODE_PRIVATE);
     }
 
     public void append(String key, JSObject jsObject) {

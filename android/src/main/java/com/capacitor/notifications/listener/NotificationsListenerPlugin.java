@@ -181,7 +181,6 @@ public class NotificationsListenerPlugin extends Plugin {
     private void pluginCleanup() {
         NotificationService.pluginInstance = null;
         NotificationService.webViewActive = false;
-        NotificationService.persistentStorage = null;
         if (NotificationService.notificationReceiver == null) {
             return;
         }
