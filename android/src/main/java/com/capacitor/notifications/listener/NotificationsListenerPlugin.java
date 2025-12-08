@@ -64,7 +64,8 @@ public class NotificationsListenerPlugin extends Plugin {
                 persistentStorage,
                 (cacheEnabledValue != null) ? cacheEnabledValue : false,
                 packagesWhitelist,
-                notificationReceiver
+                notificationReceiver,
+                getContext()
         );
 
         if (storageGroupName != null) {

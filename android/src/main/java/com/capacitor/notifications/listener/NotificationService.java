@@ -1,6 +1,7 @@
 package com.capacitor.notifications.listener;
 
 import android.app.Notification;
+import android.content.Context;
 import android.content.Intent;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
@@ -22,6 +23,7 @@ public class NotificationService extends NotificationListenerService {
     public static final String NOTIFICATIONS_STORAGE_KEY = "notificationsCache";
     public static final String CACHE_ENABLED_STORAGE_KEY = "notificationsCacheEnabled";
     public static final String WHITE_LIST_STORAGE_KEY = "notificationsWhitelist";
+    public static final String PREFERENCES_GROUP_NAME_KEY = "notificationsPreferencesGroupName";
 
     public static final String ACTION_RECEIVE = "com.capacitor.notifications.listener.NOTIFICATION_RECEIVE_EVENT";
     public static final String ACTION_REMOVE = "com.capacitor.notifications.listener.NOTIFICATION_REMOVE_EVENT";
@@ -44,6 +46,7 @@ public class NotificationService extends NotificationListenerService {
     public static Boolean cacheEnabled = null;
     public static boolean webViewActive = false;
     public static SimpleStorage persistentStorage;
+    public static SimpleStorage initPersistentStorage;
     private StatusBarNotification lastNotification;
 
     private final UUID uuid;
@@ -56,13 +59,23 @@ public class NotificationService extends NotificationListenerService {
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "Spawning NotificationService with UUID: " + uuid);
+        initPersistentStorage = new SimpleStorage(getApplicationContext());
+        String groupName = initPersistentStorage.get(PREFERENCES_GROUP_NAME_KEY);
+        persistentStorage = new SimpleStorage(getApplicationContext(), groupName == null ? initPersistentStorage.DEFAULT_GROUP_NAME : groupName);
+        packagesWhitelist = persistentStorage.retrieveArrayList(WHITE_LIST_STORAGE_KEY);
+        cacheEnabled = Boolean.parseBoolean(persistentStorage.get(CACHE_ENABLED_STORAGE_KEY));
     }
 
-    public static void init(SimpleStorage storage, Boolean cachedEnabled, ArrayList<String> whiteList, NotificationsListenerPlugin.NotificationReceiver receiver) {
+    public static void init(SimpleStorage storage, Boolean cachedEnabled, ArrayList<String> whiteList, NotificationsListenerPlugin.NotificationReceiver receiver, Context context) {
         persistentStorage = storage;
         packagesWhitelist = whiteList;
         cacheEnabled = cachedEnabled;
         notificationReceiver = receiver;
+
+        if (initPersistentStorage == null) {
+            initPersistentStorage = new SimpleStorage(context);
+        }
+        initPersistentStorage.set(PREFERENCES_GROUP_NAME_KEY, persistentStorage.groupName);
     }
 
     @Override
