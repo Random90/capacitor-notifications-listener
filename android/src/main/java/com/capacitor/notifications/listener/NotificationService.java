@@ -84,9 +84,9 @@ public class NotificationService extends NotificationListenerService {
             Log.w(TAG, "Persistent storage not initialized - notification skipped");
             return;
         }
-        Log.d(TAG, "Service ID" + this.uuid + " Whitelist size: " + (packagesWhitelist != null ? packagesWhitelist.size() : 0) + " Receiver: " + notificationReceiver + " WebViewActive: " + webViewActive);
+        Log.d(TAG, "Service ID" + this.uuid + " Whitelist size: " + (packagesWhitelist != null ? packagesWhitelist.size() : "disabled") + " Receiver: " + notificationReceiver + " WebViewActive: " + webViewActive);
         Log.d(TAG, "Received notification: " + sbn.getNotification().extras.getCharSequence("android.text"));
-        if (!existsInWhitelist(sbn)) return;
+        if (packagesWhitelist != null && !existsInWhitelist(sbn)) return;
         // workaround for duplicate notifications on older android versions after app is killed by force
         if (lastNotification != null)
         {
