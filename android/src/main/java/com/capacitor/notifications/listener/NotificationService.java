@@ -118,11 +118,10 @@ public class NotificationService extends NotificationListenerService {
 
     @Override
     public void onNotificationRemoved(StatusBarNotification sbn) {
-        if (notificationReceiver == null || !webViewActive) return;
-        if (packagesWhitelist == null || existsInWhitelist(sbn)) {
-            Intent i = notificationToIntent(sbn, ACTION_REMOVE);
-            sendBroadcast(i);
-        }
+        if (packagesWhitelist != null && !existsInWhitelist(sbn)) return;
+        Log.d(TAG, "Notification removed");
+        Intent i = notificationToIntent(sbn, ACTION_REMOVE);
+        sendBroadcast(i);
     }
 
     @Override
