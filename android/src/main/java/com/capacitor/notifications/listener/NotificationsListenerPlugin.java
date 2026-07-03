@@ -1,14 +1,20 @@
 package com.capacitor.notifications.listener;
 
 import android.Manifest;
+import android.content.ActivityNotFoundException;
 import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.util.Log;
+
+import androidx.annotation.NonNull;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -33,6 +39,8 @@ public class NotificationsListenerPlugin extends Plugin {
     private static final String TAG = NotificationsListenerPlugin.class.getSimpleName();
     private static final String EVENT_NOTIFICATION_REMOVED = "notificationRemovedEvent";
     private static final String EVENT_NOTIFICATION_RECEIVED = "notificationReceivedEvent";
+    private static final String ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS = "android.settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS";
+    private static final String EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME = "android.provider.extra.NOTIFICATION_LISTENER_COMPONENT_NAME";
 
     private NotificationReceiver notificationReceiver = null;
     private SimpleStorage persistentStorage = null;
@@ -90,8 +98,29 @@ public class NotificationsListenerPlugin extends Plugin {
 
     @PluginMethod
     public void requestPermission(PluginCall call) {
-        startActivityForResult(call, new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS), 0);
-        call.resolve();
+        Boolean forceOpenSettings = call.getBoolean("forceOpenSettings");
+        if (isNotificationListenerPermissionGranted() && (forceOpenSettings == null || !forceOpenSettings)) {
+            JSObject ret = new JSObject();
+            ret.put("value", true);
+            call.resolve(ret);
+            return;
+        }
+        try {
+            openNotificationListenerSettings();
+            JSObject ret = new JSObject();
+            ret.put("value", false);
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening notification listener settings", e);
+            call.reject("Unable to open notification listener settings", e);
+        }
+    }
+
+    @PluginMethod
+    public void isPermissionGranted(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("value", isNotificationListenerPermissionGranted());
+        call.resolve(ret);
     }
 
     @PluginMethod
@@ -177,6 +206,67 @@ public class NotificationsListenerPlugin extends Plugin {
     private void persistWhitelist(ArrayList<String> packagesWhitelist) {
         JSONArray jsonArrayWhitelist = new JSONArray(packagesWhitelist);
         persistentStorage.set(NotificationService.WHITE_LIST_STORAGE_KEY, jsonArrayWhitelist.toString());
+    }
+
+    private boolean isNotificationListenerPermissionGranted() {
+        String enabledListeners = Settings.Secure.getString(
+                getContext().getContentResolver(),
+                "enabled_notification_listeners"
+        );
+        if (TextUtils.isEmpty(enabledListeners)) {
+            return false;
+        }
+
+        ComponentName componentName = new ComponentName(getContext(), NotificationService.class);
+        String flattenedComponent = componentName.flattenToString();
+        for (String listener : enabledListeners.split(":")) {
+            if (flattenedComponent.equals(listener)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void openNotificationListenerSettings() throws ActivityNotFoundException {
+        Intent detailIntent = getDetailIntent();
+
+        try {
+            getContext().startActivity(detailIntent);
+            return;
+        } catch (ActivityNotFoundException ignored) {
+            // Fallback to generic Notification Listener screen.
+            Log.w(TAG, "Unable to open notification listener settings detail screen, falling back to generic settings screen.");
+        }
+
+        Intent listIntent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+        listIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            getContext().startActivity(listIntent);
+            return;
+        } catch (ActivityNotFoundException ignored) {
+            // Last fallback to app details page.
+            Log.w(TAG, "Unable to open notification listener settings screen, falling back to app details page.");
+        }
+
+        Intent appDetailsIntent = new Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", getContext().getPackageName(), null)
+        );
+        appDetailsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(appDetailsIntent);
+    }
+
+    @NonNull
+    private Intent getDetailIntent() {
+        ComponentName componentName = new ComponentName(getContext(), NotificationService.class);
+
+        Intent detailIntent = new Intent(ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS);
+        detailIntent.putExtra(EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, componentName.flattenToString());
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            detailIntent.putExtra(Settings.EXTRA_APP_PACKAGE, getContext().getPackageName());
+        }
+        detailIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        return detailIntent;
     }
 
     private void pluginCleanup() {

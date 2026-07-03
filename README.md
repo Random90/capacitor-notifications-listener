@@ -130,7 +130,8 @@ The default storage group name is `CapacitorStorage`.
 * [`startListening(...)`](#startlistening)
 * [`restoreCachedNotifications()`](#restorecachednotifications)
 * [`stopListening()`](#stoplistening)
-* [`requestPermission()`](#requestpermission)
+* [`requestPermission(...)`](#requestpermission)
+* [`isPermissionGranted()`](#ispermissiongranted)
 * [`isListening()`](#islistening)
 * [`removeAllListeners()`](#removealllisteners)
 * [`replacePackagesWhitelist(...)`](#replacepackageswhitelist)
@@ -206,13 +207,38 @@ stopListening() => Promise<void>
 --------------------
 
 
-### requestPermission()
+### requestPermission(...)
 
 ```typescript
-requestPermission() => Promise<void>
+requestPermission(options?: { forceOpenSettings?: boolean | undefined; } | undefined) => Promise<void>
 ```
 
-Navigates to special app permissions settings screen.
+Immediately returns { value: true } if already granted
+Otherwise tries to open:
+- Notification Listener detail settings for this service
+- Generic Notification Listener settings
+- App details settings as final fallback
+
+Returns { value: false } after opening settings (user still needs to toggle)
+
+To force open settings screen even if permission is granted, set forceOpenSettings to true.
+
+Use with App.addListener('resume', cb) and isPermissionGranted() to check if user granted permission after returning from settings
+
+| Param         | Type                                          |
+| ------------- | --------------------------------------------- |
+| **`options`** | <code>{ forceOpenSettings?: boolean; }</code> |
+
+--------------------
+
+
+### isPermissionGranted()
+
+```typescript
+isPermissionGranted() => Promise<{ value: boolean; }>
+```
+
+**Returns:** <code>Promise&lt;{ value: boolean; }&gt;</code>
 
 --------------------
 

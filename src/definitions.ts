@@ -17,9 +17,20 @@ export interface NotificationsListenerPlugin {
   restoreCachedNotifications(): Promise<void>;
   stopListening(): Promise<void>;
   /**
-   * Navigates to special app permissions settings screen.
+   * Immediately returns { value: true } if already granted
+   * Otherwise tries to open:
+   * - Notification Listener detail settings for this service
+   * - Generic Notification Listener settings
+   * - App details settings as final fallback
+   *
+   * Returns { value: false } after opening settings (user still needs to toggle)
+   *
+   * To force open settings screen even if permission is granted, set forceOpenSettings to true.
+   *
+   * Use with App.addListener('resume', cb) and isPermissionGranted() to check if user granted permission after returning from settings
    */
-  requestPermission(): Promise<void>;
+  requestPermission(options?: { forceOpenSettings?: boolean }): Promise<void>;
+  isPermissionGranted(): Promise<{ value: boolean }>;
   isListening(): Promise<{ value: boolean }>;
   removeAllListeners(): Promise<void>;
   /**

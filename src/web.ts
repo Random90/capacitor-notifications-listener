@@ -28,6 +28,9 @@ export class NotificationsListenerWeb extends WebPlugin implements Notifications
   requestPermission(): Promise<void> {
     throw new Error(this.errorMessage);
   }
+  async isPermissionGranted(): Promise<{ value: boolean }> {
+    return { value: false };
+  }
   isListening(): Promise<{ value: boolean }> {
     throw new Error(this.errorMessage);
   }
