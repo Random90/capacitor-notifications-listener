@@ -63,6 +63,7 @@ public class NotificationsListenerPlugin extends Plugin {
         String storageGroupName = call.getString("storageGroupName");
         ArrayList<String> packagesWhitelist = arrayFromPluginCall(call);
         persistentStorage = new SimpleStorage(getContext(), storageGroupName);
+        unregisterCurrentReceiver();
         IntentFilter filter = new IntentFilter();
         filter.addAction(NotificationService.ACTION_RECEIVE);
         filter.addAction(NotificationService.ACTION_REMOVE);
@@ -132,11 +133,7 @@ public class NotificationsListenerPlugin extends Plugin {
 
     @PluginMethod
     public void stopListening(PluginCall call) {
-        if (notificationReceiver == null) {
-            call.resolve();
-            return;
-        }
-        getContext().unregisterReceiver(notificationReceiver);
+        unregisterCurrentReceiver();
         call.resolve();
     }
 
@@ -272,7 +269,11 @@ public class NotificationsListenerPlugin extends Plugin {
     private void pluginCleanup() {
         NotificationService.pluginInstance = null;
         NotificationService.webViewActive = false;
-        if (NotificationService.notificationReceiver == null) {
+        unregisterCurrentReceiver();
+    }
+
+    private void unregisterCurrentReceiver() {
+        if (notificationReceiver == null) {
             return;
         }
         try {
@@ -280,6 +281,7 @@ public class NotificationsListenerPlugin extends Plugin {
         } catch (Exception e) {
             Log.e(TAG, "Error unregistering NotificationReceiver", e);
         }
+        notificationReceiver = null;
         NotificationService.notificationReceiver = null;
     }
 

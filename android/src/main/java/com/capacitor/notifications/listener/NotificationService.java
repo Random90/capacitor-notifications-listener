@@ -10,6 +10,8 @@ import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 
 import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Objects;
@@ -47,7 +49,8 @@ public class NotificationService extends NotificationListenerService {
     public static boolean webViewActive = false;
     public static SimpleStorage persistentStorage;
     public static SimpleStorage initPersistentStorage;
-    private StatusBarNotification lastNotification;
+    private static volatile StatusBarNotification lastNotification;
+    private static final long DUPLICATE_WINDOW_MS = 5000;
 
     private final UUID uuid;
 
@@ -87,15 +90,9 @@ public class NotificationService extends NotificationListenerService {
         Log.d(TAG, "Service ID" + this.uuid + " Whitelist size: " + (packagesWhitelist != null ? packagesWhitelist.size() : "disabled") + " Receiver: " + notificationReceiver + " WebViewActive: " + webViewActive);
         Log.d(TAG, "Received notification: " + sbn.getNotification().extras.getCharSequence("android.text"));
         if (packagesWhitelist != null && !existsInWhitelist(sbn)) return;
-        // workaround for duplicate notifications on older android versions after app is killed by force
-        if (lastNotification != null)
-        {
-            boolean sameText = Objects.equals(lastNotification.getNotification().extras.getCharSequence("android.text"), sbn.getNotification().extras.getCharSequence("android.text"));
-            boolean sameTime = lastNotification.getNotification().when == sbn.getNotification().when;
-            if (sameText && sameTime) {
-                Log.d(TAG, "Notification already received - skipping");
-                return;
-            }
+        if (isDuplicateOfLast(sbn) || isDuplicateInCache(sbn)) {
+            Log.d(TAG, "Notification already received - skipping");
+            return;
         }
         lastNotification = sbn;
         if (cacheEnabled == null) {
@@ -201,6 +198,57 @@ public class NotificationService extends NotificationListenerService {
             jsonArray.put(item);
         }
         return jsonArray;
+    }
+
+    private boolean isDuplicateOfLast(StatusBarNotification sbn) {
+        StatusBarNotification previous = lastNotification;
+        if (previous == null) return false;
+
+        Notification lastNotification = previous.getNotification();
+        Notification currentNotification = sbn.getNotification();
+
+        boolean samePackage = Objects.equals(previous.getPackageName(), sbn.getPackageName());
+        boolean sameTitle = Objects.equals(lastNotification.extras.getCharSequence("android.title"), currentNotification.extras.getCharSequence("android.title"));
+        boolean sameText = Objects.equals(lastNotification.extras.getCharSequence("android.text"), currentNotification.extras.getCharSequence("android.text"));
+        boolean withinWindow = Math.abs(currentNotification.when - lastNotification.when) <= DUPLICATE_WINDOW_MS;
+
+        return samePackage && sameTitle && sameText && withinWindow;
+    }
+
+    // fallback for when the in-memory guard has no history yet (e.g. a freshly restarted
+    // process), but the notification was already recorded on disk by a previous instance
+    private boolean isDuplicateInCache(StatusBarNotification sbn) {
+        if (persistentStorage == null) return false;
+        JSONArray cached = persistentStorage.retrieve(NOTIFICATIONS_STORAGE_KEY);
+        if (cached == null || cached.length() == 0) return false;
+
+        Notification currentN = sbn.getNotification();
+        String currentPackage = sbn.getPackageName();
+        String currentAppTitle = charSequenceToString(currentN.extras.getCharSequence("android.title"));
+        String currentText = charSequenceToString(currentN.extras.getCharSequence("android.text"));
+        long currentTime = currentN.when;
+
+        // entries are appended in chronological order, so scan from the newest backwards and
+        // stop once entries fall outside the duplicate window
+        for (int i = cached.length() - 1; i >= 0; i--) {
+            JSONObject entry;
+            try {
+                entry = cached.getJSONObject(i);
+            } catch (JSONException e) {
+                continue;
+            }
+            long entryTime = entry.optLong("time", -1);
+            if (entryTime >= 0 && Math.abs(currentTime - entryTime) > DUPLICATE_WINDOW_MS) {
+                break;
+            }
+            boolean samePackage = Objects.equals(currentPackage, entry.optString("package"));
+            boolean sameTitle = Objects.equals(currentAppTitle, entry.optString("apptitle"));
+            boolean sameText = Objects.equals(currentText, entry.optString("text"));
+            if (samePackage && sameTitle && sameText) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean existsInWhitelist(StatusBarNotification notification) {
